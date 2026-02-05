@@ -1,0 +1,79 @@
+version: "2"
+
+sql:
+  - engine: "postgresql"
+    queries: "sql/queries"
+    schema: "sql/schema"
+    gen:
+      go:
+        package: "repository"
+        out: "internal/repository"
+        emit_json_tags: true
+        emit_interface: false
+        emit_exact_table_names: false
+        json_tags_case_style: camel
+        overrides:
+          - db_type: "pg_catalog.varchar"
+            go_type:
+              type: "string"
+              pointer: true
+            nullable: true
+          - db_type: "text"
+            go_type:
+              type: "string"
+              pointer: true
+            nullable: true
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+          - db_type: "pg_catalog.numeric"
+            go_type:
+              type: "float64"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.timestamp"
+            go_type:
+              type: "time.Time"
+              pointer: true
+            nullable: true
+          - db_type: "timestamptz"
+            go_type:
+              type: "time.Time"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.bool"
+            go_type:
+              type: "bool"
+              pointer: true
+            nullable: true
+          - db_type: "jsonb"
+            go_type:
+              type: "string"
+              pointer: true
+            nullable: true
+          - db_type: "uuid"
+            go_type:
+              type: "uuid.UUID"
+              pointer: true
+            nullable: true
+          - db_type: "date"
+            go_type:
+              type: "time.Time"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.int4"
+            go_type:
+              type: "int32"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.float8"
+            go_type:
+              type: "float64"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.int8"
+            go_type:
+              type: "int64"
+              pointer: true
+            nullable: true

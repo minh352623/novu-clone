@@ -1,0 +1,47 @@
+server:
+  port: ${PORT}
+  mode: ${APP_ENV}
+postgresql:
+  username: ${PG_USERNAME}
+  password: ${PG_PASSWORD}
+  host: ${PG_HOST}
+  port: ${PG_PORT}
+  dbname: ${PG_DATABASE}
+  sslmode: ${PG_SSLMODE}
+  timezone: ${PG_TIMEZONE}
+  max_conn: ${PG_MAX_OPEN_CONNS}
+  idle_timeout: ${PG_MAX_IDLE_CONNS}
+  max_lifetime: ${PG_CONN_MAX_LIFETIME}
+logger:
+  log_level: ${LOG_LEVEL}
+  log_file_name: ${LOG_FILE_NAME}
+  max_size: ${LOG_MAX_SIZE}
+  max_backups: ${LOG_MAX_BACKUPS}
+  max_age: ${LOG_MAX_AGE}
+  compress: ${LOG_COMPRESS}
+mail:
+  service_url: ${MAIL_SERVICE_URL}
+  username: ${MAIL_SERVICE_USERNAME}
+  password: ${MAIL_SERVICE_PASSWORD}
+  tracking_base_url: ${MAIL_TRACKING_BASE_URL}
+auth:
+  jwt_secret: ${JWT_SECRET}
+  jwt_expires_in: ${JWT_EXPIRATION}
+  jwt_refresh_expires_in: ${JWT_REFRESH_TOKEN_EXPIRATION}
+r2:
+  bucket: ${R2_BUCKET}
+  token: ${R2_TOKEN}
+  access_key_id: ${R2_ACCESS_KEY_ID}
+  secret_access_key: ${R2_SECRET_ACCESS_KEY}
+  url: ${R2_URL}
+  public: ${R2_PUBLIC}
+notification:
+  tracking_base_url: ${NOTIFICATION_TRACKING_BASE_URL}
+  push:
+    enabled: ${PUSH_ENABLED}
+    credentials_file: ${FIREBASE_CREDENTIALS_FILE}
+  sms:
+    enabled: ${SMS_ENABLED}
+    account_sid: ${TWILIO_ACCOUNT_SID}
+    auth_token: ${TWILIO_AUTH_TOKEN}
+    from_number: ${TWILIO_FROM_NUMBER}

@@ -1,0 +1,1970 @@
+basePath: /v1/api
+definitions:
+  CONVERDA_internal_apps_controller_dto.AppResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      environments:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.EnvironmentResponse'
+        type: array
+      id:
+        type: string
+      name:
+        type: string
+      tenant_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.CreateAppRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  CONVERDA_internal_apps_controller_dto.CreateEnvironmentRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  CONVERDA_internal_apps_controller_dto.CreateProviderRequest:
+    properties:
+      configuration:
+        additionalProperties: true
+        type: object
+      environment_id:
+        type: string
+      provider_name:
+        type: string
+      provider_type:
+        type: string
+    required:
+    - environment_id
+    - provider_name
+    - provider_type
+    type: object
+  CONVERDA_internal_apps_controller_dto.CreateWebhookRequest:
+    properties:
+      description:
+        type: string
+      environment_id:
+        type: string
+      events:
+        items:
+          type: string
+        type: array
+      url:
+        type: string
+    required:
+    - environment_id
+    - url
+    type: object
+  CONVERDA_internal_apps_controller_dto.EnvironmentResponse:
+    properties:
+      api_key:
+        description: Show only once optionally? For now showing it.
+        type: string
+      app_id:
+        type: string
+      created_at:
+        type: string
+      environment_code:
+        type: string
+      id:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.ProviderResponse:
+    properties:
+      app_id:
+        type: string
+      configuration:
+        additionalProperties: true
+        type: object
+      created_at:
+        type: string
+      environment_id:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      provider_name:
+        type: string
+      provider_type:
+        type: string
+      tenant_id:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.UpdateAppRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.UpdateProviderRequest:
+    properties:
+      configuration:
+        additionalProperties: true
+        type: object
+      is_active:
+        type: boolean
+      provider_name:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.UpdateWebhookRequest:
+    properties:
+      description:
+        type: string
+      events:
+        items:
+          type: string
+        type: array
+      is_active:
+        type: boolean
+      url:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.WebhookResponse:
+    properties:
+      app_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      environment_id:
+        type: string
+      events:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      is_active:
+        type: boolean
+      secret:
+        type: string
+      tenant_id:
+        type: string
+      url:
+        type: string
+    type: object
+  CONVERDA_internal_iam_controller_dto.AcceptInvitationRequest:
+    properties:
+      token:
+        type: string
+    required:
+    - token
+    type: object
+  CONVERDA_internal_iam_controller_dto.AddMemberRequest:
+    properties:
+      role_id:
+        type: string
+      user_id:
+        type: string
+    required:
+    - user_id
+    type: object
+  CONVERDA_internal_iam_controller_dto.AssignRoleRequest:
+    properties:
+      user_id:
+        type: string
+    required:
+    - user_id
+    type: object
+  CONVERDA_internal_iam_controller_dto.AuthResponse:
+    properties:
+      token:
+        description: JWT token if applicable
+        type: string
+      user:
+        $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UserResponse'
+    type: object
+  CONVERDA_internal_iam_controller_dto.ChangePasswordRequest:
+    properties:
+      new_password:
+        minLength: 8
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  CONVERDA_internal_iam_controller_dto.CreatePricingPlanRequest:
+    properties:
+      currency:
+        type: string
+      monthly_credits:
+        minimum: 0
+        type: integer
+      name:
+        type: string
+      price:
+        minimum: 0
+        type: number
+      slug:
+        type: string
+    required:
+    - currency
+    - name
+    - slug
+    type: object
+  CONVERDA_internal_iam_controller_dto.CreateRoleRequest:
+    properties:
+      name:
+        type: string
+      permissions:
+        additionalProperties: true
+        type: object
+      slug:
+        type: string
+    required:
+    - name
+    - slug
+    type: object
+  CONVERDA_internal_iam_controller_dto.CreateTenantRequest:
+    properties:
+      name:
+        type: string
+      slug:
+        type: string
+    required:
+    - name
+    - slug
+    type: object
+  CONVERDA_internal_iam_controller_dto.InviteMemberRequest:
+    properties:
+      email:
+        type: string
+      role_id:
+        type: string
+    required:
+    - email
+    type: object
+  CONVERDA_internal_iam_controller_dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  CONVERDA_internal_iam_controller_dto.PaginatedResponse:
+    properties:
+      data: {}
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  CONVERDA_internal_iam_controller_dto.PricingPlanResponse:
+    properties:
+      currency:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_default:
+        type: boolean
+      monthly_credits:
+        type: integer
+      name:
+        type: string
+      price:
+        type: number
+      slug:
+        type: string
+    type: object
+  CONVERDA_internal_iam_controller_dto.RegisterRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  CONVERDA_internal_iam_controller_dto.RevokeRoleRequest:
+    properties:
+      user_id:
+        type: string
+    required:
+    - user_id
+    type: object
+  CONVERDA_internal_iam_controller_dto.RoleResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      permissions:
+        additionalProperties: true
+        type: object
+      slug:
+        type: string
+    type: object
+  CONVERDA_internal_iam_controller_dto.TenantInvitationResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      role_id:
+        type: string
+      status:
+        type: string
+      tenant_id:
+        type: string
+    type: object
+  CONVERDA_internal_iam_controller_dto.TenantMemberResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      role:
+        $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RoleResponse'
+      role_id:
+        type: string
+      tenant_id:
+        type: string
+      user:
+        $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UserResponse'
+      user_id:
+        type: string
+    type: object
+  CONVERDA_internal_iam_controller_dto.TenantResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      plan_start_date:
+        type: string
+      pricing_plan:
+        $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PricingPlanResponse'
+      pricing_plan_id:
+        type: string
+      slug:
+        type: string
+    type: object
+  CONVERDA_internal_iam_controller_dto.UpdatePricingPlanRequest:
+    properties:
+      currency:
+        type: string
+      is_active:
+        type: boolean
+      monthly_credits:
+        minimum: 0
+        type: integer
+      name:
+        type: string
+      price:
+        minimum: 0
+        type: number
+    type: object
+  CONVERDA_internal_iam_controller_dto.UpdateRoleRequest:
+    properties:
+      name:
+        type: string
+      permissions:
+        additionalProperties: true
+        type: object
+    type: object
+  CONVERDA_internal_iam_controller_dto.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      is_root_admin:
+        type: boolean
+      last_login_at:
+        type: string
+    type: object
+  CONVERDA_internal_r2_service_dto.ImageDTO:
+    properties:
+      base64:
+        type: string
+      key:
+        type: string
+    required:
+    - base64
+    - key
+    type: object
+  CONVERDA_internal_r2_service_dto.UploadRequest:
+    properties:
+      images:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_r2_service_dto.ImageDTO'
+        type: array
+    required:
+    - images
+    type: object
+  CONVERDA_internal_r2_service_dto.UploadResponse:
+    properties:
+      failedCount:
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_r2_service_dto.UploadResult'
+        type: array
+      successCount:
+        type: integer
+      totalCount:
+        type: integer
+    type: object
+  CONVERDA_internal_r2_service_dto.UploadResult:
+    properties:
+      error:
+        type: string
+      key:
+        type: string
+      success:
+        type: boolean
+      url:
+        type: string
+    type: object
+  CONVERDA_pkg_response.APIError:
+    properties:
+      err: {}
+      message:
+        type: string
+      statusCode:
+        type: integer
+    type: object
+externalDocs:
+  description: OpenAPI
+  url: https://swagger.io/resources/open-api/
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a server for a Go Drunk Backend API, demonstrating DDD principles.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Go Drunk Backend API by DDD
+  version: "1.0"
+paths:
+  /apps/{app_id}:
+    delete:
+      description: Delete an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete app
+      tags:
+      - Apps
+    get:
+      description: Get details of a specific app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.AppResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get app
+      tags:
+      - Apps
+    put:
+      consumes:
+      - application/json
+      description: Update an existing app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.UpdateAppRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.AppResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update app
+      tags:
+      - Apps
+  /apps/{app_id}/environments:
+    get:
+      description: List all environments for an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.EnvironmentResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List environments
+      tags:
+      - Apps
+    post:
+      consumes:
+      - application/json
+      description: Create a new environment for an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: Environment data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.CreateEnvironmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.EnvironmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create environment
+      tags:
+      - Apps
+  /apps/{app_id}/providers:
+    get:
+      description: List all providers for an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.ProviderResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List providers
+      tags:
+      - Providers
+    post:
+      consumes:
+      - application/json
+      description: Create a new provider for an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: Provider data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.CreateProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.ProviderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a provider
+      tags:
+      - Providers
+  /apps/{app_id}/webhooks:
+    get:
+      description: List all webhooks for an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.WebhookResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List webhooks
+      tags:
+      - Webhooks
+    post:
+      consumes:
+      - application/json
+      description: Create a new webhook for an app
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: Webhook data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.CreateWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.WebhookResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a webhook
+      tags:
+      - Webhooks
+  /auth/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Change the current user's password
+      parameters:
+      - description: Password change data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - Auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login user
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh the user's access token
+      parameters:
+      - description: Refresh token data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Refresh access token
+      tags:
+      - Auth
+  /invitations/accept:
+    post:
+      consumes:
+      - application/json
+      description: Accept an invitation using a token
+      parameters:
+      - description: Token data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.AcceptInvitationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantMemberResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Accept invitation
+      tags:
+      - Invitations
+  /pricing-plans:
+    get:
+      consumes:
+      - application/json
+      description: List pricing plans with filtering and pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Search term
+        in: query
+        name: search
+        type: string
+      - description: Filter by active status
+        in: query
+        name: is_active
+        type: boolean
+      - description: Filter by default status
+        in: query
+        name: is_default
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PaginatedResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List pricing plans
+      tags:
+      - Pricing Plans
+    post:
+      consumes:
+      - application/json
+      description: Create a new pricing plan
+      parameters:
+      - description: Create Pricing Plan Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.CreatePricingPlanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PricingPlanResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create pricing plan
+      tags:
+      - Pricing Plans
+  /pricing-plans/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a pricing plan by ID
+      parameters:
+      - description: Pricing Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete pricing plan
+      tags:
+      - Pricing Plans
+    get:
+      consumes:
+      - application/json
+      description: Get a pricing plan by ID
+      parameters:
+      - description: Pricing Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PricingPlanResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get pricing plan
+      tags:
+      - Pricing Plans
+    put:
+      consumes:
+      - application/json
+      description: Update a pricing plan by ID
+      parameters:
+      - description: Pricing Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Pricing Plan Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UpdatePricingPlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PricingPlanResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update pricing plan
+      tags:
+      - Pricing Plans
+  /pricing-plans/{id}/set-default:
+    post:
+      consumes:
+      - application/json
+      description: Set a pricing plan as default
+      parameters:
+      - description: Pricing Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Set pricing plan as default
+      tags:
+      - Pricing Plans
+  /providers/{provider_id}:
+    delete:
+      description: Delete a provider
+      parameters:
+      - description: Provider ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete provider
+      tags:
+      - Providers
+    get:
+      description: Get details of a specific provider
+      parameters:
+      - description: Provider ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.ProviderResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get provider
+      tags:
+      - Providers
+    put:
+      consumes:
+      - application/json
+      description: Update an existing provider
+      parameters:
+      - description: Provider ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.UpdateProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.ProviderResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update provider
+      tags:
+      - Providers
+  /r2/delete:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a file from R2 storage by key
+      parameters:
+      - description: File key to delete
+        in: query
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/CONVERDA_pkg_response.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/CONVERDA_pkg_response.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/CONVERDA_pkg_response.APIError'
+      security:
+      - BearerAuth: []
+      summary: Delete a file from R2
+      tags:
+      - R2
+  /r2/upload:
+    post:
+      consumes:
+      - application/json
+      description: Upload multiple files to R2 storage using base64 encoded strings
+      parameters:
+      - description: Upload Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_r2_service_dto.UploadRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_r2_service_dto.UploadResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/CONVERDA_pkg_response.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/CONVERDA_pkg_response.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/CONVERDA_pkg_response.APIError'
+      security:
+      - BearerAuth: []
+      summary: Upload files using base64
+      tags:
+      - R2
+  /roles:
+    get:
+      description: Get a paginated list of all roles
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Search term
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: List all roles
+      tags:
+      - Roles
+    post:
+      consumes:
+      - application/json
+      description: Create a new role with permissions
+      parameters:
+      - description: Role data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RoleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new role
+      tags:
+      - Roles
+  /roles/{id}:
+    delete:
+      description: Delete an existing role
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a role
+      tags:
+      - Roles
+    get:
+      description: Get a specific role by its ID
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RoleResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get role by ID
+      tags:
+      - Roles
+    put:
+      consumes:
+      - application/json
+      description: Update an existing role
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RoleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a role
+      tags:
+      - Roles
+  /roles/{id}/assign:
+    post:
+      consumes:
+      - application/json
+      description: Assign a role to a specific user
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.AssignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Assign role to user
+      tags:
+      - Roles
+  /roles/{id}/permissions:
+    put:
+      consumes:
+      - application/json
+      description: Update the permissions of a role
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permissions map
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update role permissions
+      tags:
+      - Roles
+  /roles/{id}/revoke:
+    post:
+      consumes:
+      - application/json
+      description: Revoke a role from a specific user
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RevokeRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke role from user
+      tags:
+      - Roles
+  /tenants:
+    get:
+      description: Get a paginated list of all tenants
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Search term
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: List all tenants
+      tags:
+      - Tenants
+    post:
+      consumes:
+      - application/json
+      description: Create a new tenant/organization
+      parameters:
+      - description: Tenant data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.CreateTenantRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new tenant
+      tags:
+      - Tenants
+  /tenants/{id}:
+    delete:
+      description: Delete a tenant
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete tenant
+      tags:
+      - Tenants
+    get:
+      description: Get a specific tenant by its ID
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get tenant by ID
+      tags:
+      - Tenants
+    put:
+      consumes:
+      - application/json
+      description: Update an existing tenant
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.CreateTenantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update tenant
+      tags:
+      - Tenants
+  /tenants/{id}/apps:
+    get:
+      description: List all apps for a tenant
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.AppResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List apps
+      tags:
+      - Apps
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: App data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.CreateAppRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.AppResponse'
+      summary: Create a new app
+      tags:
+      - Apps
+  /tenants/{id}/invitations:
+    post:
+      consumes:
+      - application/json
+      description: Invite a user via email to join a tenant
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Invitation data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.InviteMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantInvitationResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Invite member to tenant
+      tags:
+      - Tenants
+  /tenants/{id}/members:
+    get:
+      description: Get all members of a tenant
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantMemberResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get tenant members
+      tags:
+      - Tenants
+    post:
+      consumes:
+      - application/json
+      description: Add a user as a member of a tenant
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.AddMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantMemberResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add member to tenant
+      tags:
+      - Tenants
+  /tenants/me:
+    get:
+      description: Get all tenants the current user is a member of
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.TenantResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get current user's tenants
+      tags:
+      - Tenants
+  /users/me:
+    get:
+      description: Get details of the currently authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - Users
+  /webhooks/{webhook_id}:
+    delete:
+      description: Delete a webhook
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: webhook_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete webhook
+      tags:
+      - Webhooks
+    get:
+      description: Get details of a specific webhook
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: webhook_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.WebhookResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get webhook
+      tags:
+      - Webhooks
+    put:
+      consumes:
+      - application/json
+      description: Update an existing webhook
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: webhook_id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.UpdateWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.WebhookResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update webhook
+      tags:
+      - Webhooks
+securityDefinitions:
+  BearerAuth:
+    description: Enter the token with the `Bearer ` prefix, e.g. "Bearer abcde12345"
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
