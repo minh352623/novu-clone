@@ -51,12 +51,17 @@ func (r *tenantMemberRepository) GetByID(ctx context.Context, id uuid.UUID) (*en
 }
 
 func (r *tenantMemberRepository) GetByTenantAndUser(ctx context.Context, tenantID, userID uuid.UUID) (*entity.TenantMember, error) {
+	// Default to tenant-level check (app_id IS NULL) if not specified?
+	// Or should this return ANY membership?
+	// Based on previous unique constraint, this returned the single membership.
+	// Now there might be multiple.
+	// Let's assume this method is for tenant-level membership (where AppID is NULL).
 	var m model.TenantMemberModel
 	if err := r.db.WithContext(ctx).
 		Preload("Tenant").
 		Preload("User").
 		Preload("Role").
-		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
+		Where("tenant_id = ? AND user_id = ? AND app_id IS NULL", tenantID, userID).
 		First(&m).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -80,6 +85,8 @@ func (r *tenantMemberRepository) GetAll(ctx context.Context, filters repository.
 	if filters.RoleID != nil {
 		query = query.Where("role_id = ?", *filters.RoleID)
 	}
+	// Add filter for AppID if you add it to filters struct later
+	// For now, let's just return everything matching the other filters
 
 	query = query.Order("created_at DESC")
 
@@ -203,4 +210,27 @@ func (r *tenantMemberRepository) ExistsByTenantAndUser(ctx context.Context, tena
 		return false, fmt.Errorf("failed to check membership existence: %w", err)
 	}
 	return count > 0, nil
+}
+
+func (r *tenantMemberRepository) GetByTenantUserAndApp(ctx context.Context, tenantID, userID uuid.UUID, appID *uuid.UUID) (*entity.TenantMember, error) {
+	var m model.TenantMemberModel
+	query := r.db.WithContext(ctx).
+		Preload("Tenant").
+		Preload("User").
+		Preload("Role").
+		Where("tenant_id = ? AND user_id = ?", tenantID, userID)
+
+	if appID != nil {
+		query = query.Where("app_id = ?", *appID)
+	} else {
+		query = query.Where("app_id IS NULL")
+	}
+
+	if err := query.First(&m).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get tenant member: %w", err)
+	}
+	return r.mapper.ToDomain(&m), nil
 }

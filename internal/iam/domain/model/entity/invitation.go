@@ -27,6 +27,7 @@ type TenantInvitation struct {
 	TenantID  uuid.UUID        `json:"tenant_id"`
 	Email     string           `json:"email"`
 	RoleID    *uuid.UUID       `json:"role_id,omitempty"`
+	AppID     *uuid.UUID       `json:"app_id,omitempty"` // Nullable: tenant-level permission
 	Token     string           `json:"-"`
 	Status    InvitationStatus `json:"status"`
 	InvitedBy *uuid.UUID       `json:"invited_by,omitempty"`
@@ -35,7 +36,7 @@ type TenantInvitation struct {
 	UpdatedAt time.Time        `json:"updated_at"`
 }
 
-func NewTenantInvitation(tenantID uuid.UUID, email string, roleID *uuid.UUID, invitedBy *uuid.UUID, duration time.Duration) (*TenantInvitation, error) {
+func NewTenantInvitation(tenantID uuid.UUID, email string, roleID, appID *uuid.UUID, invitedBy *uuid.UUID, duration time.Duration) (*TenantInvitation, error) {
 	if email == "" {
 		return nil, errors.New("email is required")
 	}
@@ -48,6 +49,7 @@ func NewTenantInvitation(tenantID uuid.UUID, email string, roleID *uuid.UUID, in
 		TenantID:  tenantID,
 		Email:     email,
 		RoleID:    roleID,
+		AppID:     appID,
 		Token:     token,
 		Status:    InvitationStatusPending,
 		InvitedBy: invitedBy,

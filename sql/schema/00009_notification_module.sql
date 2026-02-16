@@ -134,7 +134,8 @@ CREATE TABLE notification_logs (
 -- Notification Tracking (Opens/Clicks)
 CREATE TABLE notification_trackings (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
-    log_id UUID NOT NULL,
+    notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    tracking_token TEXT UNIQUE NOT NULL,
     tracking_token TEXT UNIQUE NOT NULL,
     
     opened_at TIMESTAMP WITH TIME ZONE,
@@ -211,7 +212,7 @@ ALTER TABLE notification_groups DISABLE ROW LEVEL SECURITY;
 DROP TABLE IF EXISTS subscriber_devices;
 DROP TABLE IF EXISTS subscriber_notification_preferences;
 DROP TABLE IF EXISTS notification_trackings;
-DROP TABLE IF EXISTS notification_logs;
+DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS notification_jobs;
 DROP TABLE IF EXISTS notification_template_contents;
 DROP TABLE IF EXISTS notification_templates;

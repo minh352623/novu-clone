@@ -1,5 +1,42 @@
 basePath: /v1/api
 definitions:
+  CONVERDA_internal_apps_controller_dto.APIKeyFullResponse:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      plain_key:
+        description: Only returned once on creation/rotation
+        type: string
+      prefix:
+        type: string
+      revoked_at:
+        type: string
+      suffix:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.APIKeyResponse:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      prefix:
+        type: string
+      revoked_at:
+        type: string
+      suffix:
+        type: string
+    type: object
   CONVERDA_internal_apps_controller_dto.AppResponse:
     properties:
       created_at:
@@ -69,9 +106,6 @@ definitions:
     type: object
   CONVERDA_internal_apps_controller_dto.EnvironmentResponse:
     properties:
-      api_key:
-        description: Show only once optionally? For now showing it.
-        type: string
       app_id:
         type: string
       created_at:
@@ -80,6 +114,10 @@ definitions:
         type: string
       id:
         type: string
+      keys:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyResponse'
+        type: array
     type: object
   CONVERDA_internal_apps_controller_dto.ProviderResponse:
     properties:
@@ -101,6 +139,22 @@ definitions:
       provider_type:
         type: string
       tenant_id:
+        type: string
+    type: object
+  CONVERDA_internal_apps_controller_dto.RotateKeyRequest:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  CONVERDA_internal_apps_controller_dto.SystemEnvironmentResponse:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      name:
         type: string
     type: object
   CONVERDA_internal_apps_controller_dto.UpdateAppRequest:
@@ -167,6 +221,8 @@ definitions:
     type: object
   CONVERDA_internal_iam_controller_dto.AddMemberRequest:
     properties:
+      app_id:
+        type: string
       role_id:
         type: string
       user_id:
@@ -183,8 +239,11 @@ definitions:
     type: object
   CONVERDA_internal_iam_controller_dto.AuthResponse:
     properties:
+      refresh_token:
+        description: Refresh Token
+        type: string
       token:
-        description: JWT token if applicable
+        description: Access Token
         type: string
       user:
         $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UserResponse'
@@ -244,6 +303,8 @@ definitions:
     type: object
   CONVERDA_internal_iam_controller_dto.InviteMemberRequest:
     properties:
+      app_id:
+        type: string
       email:
         type: string
       role_id:
@@ -292,6 +353,13 @@ definitions:
       slug:
         type: string
     type: object
+  CONVERDA_internal_iam_controller_dto.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   CONVERDA_internal_iam_controller_dto.RegisterRequest:
     properties:
       email:
@@ -328,6 +396,8 @@ definitions:
     type: object
   CONVERDA_internal_iam_controller_dto.TenantInvitationResponse:
     properties:
+      app_id:
+        type: string
       created_at:
         type: string
       email:
@@ -345,6 +415,8 @@ definitions:
     type: object
   CONVERDA_internal_iam_controller_dto.TenantMemberResponse:
     properties:
+      app_id:
+        type: string
       created_at:
         type: string
       id:
@@ -415,6 +487,187 @@ definitions:
       last_login_at:
         type: string
     type: object
+  CONVERDA_internal_messaging_controller_dto.AddParticipantsRequest:
+    properties:
+      participants:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantDTO'
+        minItems: 1
+        type: array
+    required:
+    - participants
+    type: object
+  CONVERDA_internal_messaging_controller_dto.AgentStatsResponse:
+    properties:
+      avg_response_time:
+        type: number
+      current_open_threads:
+        type: integer
+      member_id:
+        type: string
+      total_assigned:
+        type: integer
+      total_resolved:
+        type: integer
+    type: object
+  CONVERDA_internal_messaging_controller_dto.AssignConversationRequest:
+    properties:
+      member_id:
+        description: Optional, if empty assigns to caller
+        type: string
+    type: object
+  CONVERDA_internal_messaging_controller_dto.BulkAssignRequest:
+    properties:
+      member_id:
+        description: Optional
+        type: string
+      thread_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - thread_ids
+    type: object
+  CONVERDA_internal_messaging_controller_dto.CreateDirectChatRequest:
+    properties:
+      target:
+        $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantDTO'
+    required:
+    - target
+    type: object
+  CONVERDA_internal_messaging_controller_dto.CreateGroupChatRequest:
+    properties:
+      name:
+        type: string
+      participants:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantDTO'
+        minItems: 1
+        type: array
+    required:
+    - name
+    - participants
+    type: object
+  CONVERDA_internal_messaging_controller_dto.InboundMessageRequest:
+    properties:
+      content:
+        type: object
+      environment_id:
+        type: string
+      subscriber_key:
+        type: string
+    required:
+    - content
+    - environment_id
+    - subscriber_key
+    type: object
+  CONVERDA_internal_messaging_controller_dto.InternalNoteRequest:
+    properties:
+      content:
+        type: object
+    required:
+    - content
+    type: object
+  CONVERDA_internal_messaging_controller_dto.MessageResponse:
+    properties:
+      content:
+        type: object
+      created_at:
+        type: string
+      id:
+        type: string
+      parent_id:
+        type: string
+      sender_type:
+        type: string
+      thread_id:
+        type: string
+    type: object
+  CONVERDA_internal_messaging_controller_dto.Meta:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  CONVERDA_internal_messaging_controller_dto.PaginatedResponse:
+    properties:
+      data: {}
+      meta:
+        $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.Meta'
+    type: object
+  CONVERDA_internal_messaging_controller_dto.ParticipantDTO:
+    properties:
+      id:
+        type: string
+      type:
+        enum:
+        - user
+        - subscriber
+        type: string
+    required:
+    - id
+    - type
+    type: object
+  CONVERDA_internal_messaging_controller_dto.ParticipantResponse:
+    properties:
+      display_name:
+        type: string
+      entity_id:
+        type: string
+      entity_type:
+        type: string
+    type: object
+  CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest:
+    properties:
+      content:
+        type: object
+    required:
+    - content
+    type: object
+  CONVERDA_internal_messaging_controller_dto.TeamStatsResponse:
+    properties:
+      avg_response_time:
+        type: number
+      resolved_count:
+        type: integer
+      sla_compliance_rate:
+        type: number
+      total_conversations:
+        type: integer
+    type: object
+  CONVERDA_internal_messaging_controller_dto.ThreadResponse:
+    properties:
+      created_at:
+        type: string
+      environment_id:
+        type: string
+      id:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      participants:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantResponse'
+        type: array
+      status:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  CONVERDA_internal_messaging_controller_dto.UpdateGroupChatRequest:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
   CONVERDA_internal_r2_service_dto.ImageDTO:
     properties:
       base64:
@@ -466,6 +719,17 @@ definitions:
       statusCode:
         type: integer
     type: object
+  internal_apps_controller.HealthResponse:
+    properties:
+      checks:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
 externalDocs:
   description: OpenAPI
   url: https://swagger.io/resources/open-api/
@@ -482,6 +746,74 @@ info:
   title: Go Drunk Backend API by DDD
   version: "1.0"
 paths:
+  /analytics/conversations/me:
+    get:
+      description: Get messaging performance metrics for the current agent
+      parameters:
+      - description: From Date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To Date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.AgentStatsResponse'
+      security:
+      - BearerAuth: []
+      summary: Get My Analytics
+      tags:
+      - Analytics
+  /analytics/conversations/team:
+    get:
+      description: Get messaging performance metrics for the team
+      parameters:
+      - description: From Date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To Date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.TeamStatsResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Team Analytics
+      tags:
+      - Analytics
+  /api-keys/{key_id}/revoke:
+    post:
+      parameters:
+      - description: Key ID
+        in: path
+        name: key_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke API Key
+      tags:
+      - Apps
   /apps/{app_id}:
     delete:
       description: Delete an app
@@ -634,6 +966,32 @@ paths:
       summary: Create environment
       tags:
       - Apps
+  /apps/{app_id}/metrics:
+    get:
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: Days to look back
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get App usage metrics
+      tags:
+      - Apps
   /apps/{app_id}/providers:
     get:
       description: List all providers for an app
@@ -671,6 +1029,11 @@ paths:
       - description: App ID
         in: path
         name: app_id
+        required: true
+        type: string
+      - description: Tenant ID
+        in: query
+        name: tenant_id
         required: true
         type: string
       - description: Provider data
@@ -734,6 +1097,11 @@ paths:
       - description: App ID
         in: path
         name: app_id
+        required: true
+        type: string
+      - description: Tenant ID
+        in: query
+        name: tenant_id
         required: true
         type: string
       - description: Webhook data
@@ -837,7 +1205,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RegisterRequest'
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RefreshTokenRequest'
       produces:
       - application/json
       responses:
@@ -854,6 +1222,468 @@ paths:
       summary: Refresh access token
       tags:
       - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - Auth
+  /conversations:
+    get:
+      description: List conversations with filters
+      parameters:
+      - description: Status (unassigned, assigned, resolved)
+        in: query
+        name: status
+        type: string
+      - description: 'filter: ''me'' or ''all'''
+        in: query
+        name: assigned_to
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: List Conversations
+      tags:
+      - Messaging
+  /conversations/{id}:
+    get:
+      description: List messages in a conversation
+      parameters:
+      - description: Pool ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse'
+            type: array
+      summary: Get Conversation Thread
+      tags:
+      - Messaging
+  /conversations/{id}/assign:
+    patch:
+      consumes:
+      - application/json
+      description: Assign a conversation to an agent
+      parameters:
+      - description: Pool ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Assignee Data
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.AssignConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Assign Conversation
+      tags:
+      - Messaging
+  /conversations/{id}/messages:
+    post:
+      consumes:
+      - application/json
+      description: Agent replies to a conversation pool
+      parameters:
+      - description: Pool ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Message Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Reply to Conversation
+      tags:
+      - Messaging
+  /conversations/{id}/notes:
+    post:
+      consumes:
+      - application/json
+      description: Add an internal note to a conversation
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Note Content
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.InternalNoteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Add Internal Note
+      tags:
+      - Messaging
+  /conversations/{id}/read:
+    post:
+      description: Mark all messages in thread as read
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Mark Thread Read
+      tags:
+      - Messaging
+  /conversations/{id}/resolve:
+    post:
+      description: Mark conversation as resolved
+      parameters:
+      - description: Pool ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Resolve Conversation
+      tags:
+      - Messaging
+  /conversations/{id}/unassign:
+    post:
+      description: Return conversation to the pool (unassigned)
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Unassign Conversation
+      tags:
+      - Messaging
+  /conversations/assign:
+    patch:
+      consumes:
+      - application/json
+      description: Assign multiple conversations efficiently
+      parameters:
+      - description: Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.BulkAssignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Bulk Assign Conversations
+      tags:
+      - Messaging
+  /conversations/direct:
+    post:
+      consumes:
+      - application/json
+      description: Create a 1-1 chat between 2 members or return existing one
+      parameters:
+      - description: Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.CreateDirectChatRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ThreadResponse'
+      security:
+      - BearerAuth: []
+      summary: Create or Get Direct Chat
+      tags:
+      - Messaging
+  /conversations/group:
+    post:
+      consumes:
+      - application/json
+      description: Create a global group chat
+      parameters:
+      - description: Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.CreateGroupChatRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ThreadResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Group Chat
+      tags:
+      - Messaging
+  /conversations/group/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Update group name
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.UpdateGroupChatRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Update Group Chat
+      tags:
+      - Messaging
+  /conversations/group/{id}/participants:
+    post:
+      consumes:
+      - application/json
+      description: Add members to group
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.AddParticipantsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Add Group Participants
+      tags:
+      - Messaging
+  /conversations/group/{id}/participants/{memberID}:
+    delete:
+      description: Remove a member from group
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Remove Group Participant
+      tags:
+      - Messaging
+  /conversations/inbound:
+    post:
+      consumes:
+      - application/json
+      description: Receive a message from external subscriber
+      parameters:
+      - description: Message Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.InboundMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse'
+      summary: Receive Inbound Message
+      tags:
+      - Messaging
+  /environments/{id}/api-keys:
+    get:
+      parameters:
+      - description: Env ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List API Keys
+      tags:
+      - Apps
+  /environments/{id}/api-keys/rotate:
+    post:
+      consumes:
+      - application/json
+      description: Revokes all old keys and generates a new one
+      parameters:
+      - description: Env ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Key data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.RotateKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyFullResponse'
+      security:
+      - BearerAuth: []
+      summary: Rotate API Key
+      tags:
+      - Apps
+  /health:
+    get:
+      description: Check the health status of the system and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_apps_controller.HealthResponse'
+      summary: System health check
+      tags:
+      - System
   /invitations/accept:
     post:
       consumes:
@@ -1522,6 +2352,23 @@ paths:
       summary: Revoke role from user
       tags:
       - Roles
+  /system/environments:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.SystemEnvironmentResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      summary: List system environments
+      tags:
+      - System
   /tenants:
     get:
       description: Get a paginated list of all tenants
@@ -1727,6 +2574,8 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.AppResponse'
+      security:
+      - BearerAuth: []
       summary: Create a new app
       tags:
       - Apps
@@ -1863,6 +2712,12 @@ paths:
             $ref: '#/definitions/CONVERDA_internal_iam_controller_dto.UserResponse'
         "401":
           description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
           schema:
             additionalProperties:
               type: string

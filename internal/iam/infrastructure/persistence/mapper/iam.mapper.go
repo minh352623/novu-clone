@@ -209,6 +209,7 @@ func (m *TenantMemberMapper) ToDomain(model *model.TenantMemberModel) *entity.Te
 		TenantID:  model.TenantID,
 		UserID:    model.UserID,
 		RoleID:    model.RoleID,
+		AppID:     model.AppID,
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
 	}
@@ -233,6 +234,7 @@ func (m *TenantMemberMapper) ToModel(entity *entity.TenantMember) *model.TenantM
 		TenantID:  entity.TenantID,
 		UserID:    entity.UserID,
 		RoleID:    entity.RoleID,
+		AppID:     entity.AppID,
 		CreatedAt: entity.CreatedAt,
 		UpdatedAt: entity.UpdatedAt,
 	}

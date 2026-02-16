@@ -16,23 +16,29 @@ import (
 type memberServiceImpl struct {
 	memberRepo     repository.TenantMemberRepository
 	roleRepo       repository.RoleRepository
+	tenantRepo     repository.TenantRepository
 	invitationRepo repository.InvitationRepository
+	emailService   service.EmailService
 }
 
 // NewMemberService creates a new MemberService
 func NewMemberService(
 	memberRepo repository.TenantMemberRepository,
 	roleRepo repository.RoleRepository,
+	tenantRepo repository.TenantRepository,
 	invitationRepo repository.InvitationRepository,
+	emailService service.EmailService,
 ) service.MemberService {
 	return &memberServiceImpl{
 		memberRepo:     memberRepo,
 		roleRepo:       roleRepo,
+		tenantRepo:     tenantRepo,
 		invitationRepo: invitationRepo,
+		emailService:   emailService,
 	}
 }
 
-func (s *memberServiceImpl) AddMember(ctx context.Context, tenantID, userID uuid.UUID, roleID *uuid.UUID) (*entity.TenantMember, error) {
+func (s *memberServiceImpl) AddMember(ctx context.Context, tenantID, userID uuid.UUID, roleID, appID *uuid.UUID) (*entity.TenantMember, error) {
 	// Check if already a member
 	exists, err := s.memberRepo.ExistsByTenantAndUser(ctx, tenantID, userID)
 	if err != nil {
@@ -43,7 +49,7 @@ func (s *memberServiceImpl) AddMember(ctx context.Context, tenantID, userID uuid
 	}
 
 	// Create member
-	member, err := entity.NewTenantMember(tenantID, userID, roleID)
+	member, err := entity.NewTenantMember(tenantID, userID, roleID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create member: %w", err)
 	}
@@ -78,6 +84,10 @@ func (s *memberServiceImpl) AssignRole(ctx context.Context, memberID, roleID uui
 	return s.memberRepo.AssignRole(ctx, memberID, roleID)
 }
 
+func (s *memberServiceImpl) RevokeRole(ctx context.Context, memberID uuid.UUID) error {
+	return s.memberRepo.RemoveRole(ctx, memberID)
+}
+
 func (s *memberServiceImpl) CheckMembership(ctx context.Context, tenantID, userID uuid.UUID) (*entity.TenantMember, error) {
 	member, err := s.memberRepo.GetByTenantAndUser(ctx, tenantID, userID)
 	if err != nil {
@@ -89,7 +99,7 @@ func (s *memberServiceImpl) CheckMembership(ctx context.Context, tenantID, userI
 	return member, nil
 }
 
-func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID, email string, roleID *uuid.UUID, invitedBy uuid.UUID) (*entity.TenantInvitation, error) {
+func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID, email string, roleID, appID *uuid.UUID, invitedBy uuid.UUID) (*entity.TenantInvitation, error) {
 	// 1. Verify inviter is a member and has permission (Admin)
 	inviter, err := s.memberRepo.GetByTenantAndUser(ctx, tenantID, invitedBy)
 	if err != nil {
@@ -104,26 +114,18 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 	if err != nil {
 		return nil, fmt.Errorf("failed to get role: %w", err)
 	}
-	// Assumption: Only TenantAdmin or Owner can invite. Or check permission "tenant.invite".
-	// For simplicity, checking if role is 'tenant_admin' or 'owner'.
 	if inviterRole.Slug != "tenant_admin" && inviterRole.Slug != "owner" {
-		// Or check permissions map
 		return nil, service.ErrUnauthorized
 	}
 
-	// 2. Check if user already exists in tenant? (Optional, but good UX)
-	// We can't check by email easily against members without user table join or extra query.
-	// We'll skip for now or rely on "Create member" uniqueness constraint later.
-
-	// 3. Check if pending invitation exists
+	// 2. Check if pending invitation exists
 	existingInvite, _ := s.invitationRepo.GetByEmailAndTenant(ctx, email, tenantID)
 	if existingInvite != nil {
 		return nil, fmt.Errorf("invitation already pending for this email")
 	}
 
-	// 4. Create Invitation
-	// 7 days expiration
-	invitation, err := entity.NewTenantInvitation(tenantID, email, roleID, &invitedBy, 24*7*time.Hour)
+	// 3. Create Invitation
+	invitation, err := entity.NewTenantInvitation(tenantID, email, roleID, appID, &invitedBy, 24*7*time.Hour)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +135,36 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 		return nil, fmt.Errorf("failed to create invitation: %w", err)
 	}
 
-	// 5. Send Email (Mock)
-	fmt.Printf("MOCK MAIL SEND: Invitation to %s with token %s\n", email, createdInvite.Token)
+	// 4. Send Email
+	// Fetch Tenant Name
+	tenant, err := s.tenantRepo.GetByID(ctx, tenantID)
+	tenantName := "Converda Team"
+	if err == nil && tenant != nil {
+		tenantName = tenant.Name
+	}
+
+	// Fetch Role Name for email
+	roleName := inviterRole.Name
+	// Wait, we want the *invited* role name, not inviter's role.
+	// roleID is passed arg.
+	if roleID != nil {
+		invitedRole, err := s.roleRepo.GetByID(ctx, *roleID)
+		if err == nil && invitedRole != nil {
+			roleName = invitedRole.Name
+		} else {
+			roleName = "Member"
+		}
+	} else {
+		roleName = "Member"
+	}
+
+	go func() {
+		// Use background context for sending email to avoid cancellation if request ends?
+		// But we should probably use a separate context with timeout.
+		// For now using todo/background context.
+		// Ignoring error for async simplicity, but logging would be better.
+		_ = s.emailService.SendInvitation(context.Background(), email, createdInvite.Token, roleName, tenantName)
+	}()
 
 	return createdInvite, nil
 }
@@ -163,7 +193,7 @@ func (s *memberServiceImpl) AcceptInvitation(ctx context.Context, token string, 
 	}
 
 	// 4. Create Member
-	member, err := entity.NewTenantMember(invitation.TenantID, userID, invitation.RoleID)
+	member, err := entity.NewTenantMember(invitation.TenantID, userID, invitation.RoleID, invitation.AppID)
 	if err != nil {
 		return nil, err
 	}

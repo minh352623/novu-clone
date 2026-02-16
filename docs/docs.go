@@ -24,6 +24,117 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/analytics/conversations/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get messaging performance metrics for the current agent",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get My Analytics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.AgentStatsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/conversations/team": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get messaging performance metrics for the team",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get Team Analytics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.TeamStatsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api-keys/{key_id}/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "Revoke API Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key ID",
+                        "name": "key_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/apps/{app_id}": {
             "get": {
                 "security": [
@@ -263,6 +374,48 @@ const docTemplate = `{
                 }
             }
         },
+        "/apps/{app_id}/metrics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "Get App usage metrics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "App ID",
+                        "name": "app_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Days to look back",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/apps/{app_id}/providers": {
             "get": {
                 "security": [
@@ -331,6 +484,13 @@ const docTemplate = `{
                         "description": "App ID",
                         "name": "app_id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tenant ID",
+                        "name": "tenant_id",
+                        "in": "query",
                         "required": true
                     },
                     {
@@ -430,6 +590,13 @@ const docTemplate = `{
                         "description": "App ID",
                         "name": "app_id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tenant ID",
+                        "name": "tenant_id",
+                        "in": "query",
                         "required": true
                     },
                     {
@@ -584,7 +751,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/CONVERDA_internal_iam_controller_dto.RegisterRequest"
+                            "$ref": "#/definitions/CONVERDA_internal_iam_controller_dto.RefreshTokenRequest"
                         }
                     }
                 ],
@@ -602,6 +769,742 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Create a new user account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Registration data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_iam_controller_dto.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_iam_controller_dto.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List conversations with filters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "List Conversations",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Status (unassigned, assigned, resolved)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter: 'me' or 'all'",
+                        "name": "assigned_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/assign": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assign multiple conversations efficiently",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Bulk Assign Conversations",
+                "parameters": [
+                    {
+                        "description": "Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.BulkAssignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/direct": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a 1-1 chat between 2 members or return existing one",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Create or Get Direct Chat",
+                "parameters": [
+                    {
+                        "description": "Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.CreateDirectChatRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ThreadResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/group": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a global group chat",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Create Group Chat",
+                "parameters": [
+                    {
+                        "description": "Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.CreateGroupChatRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ThreadResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/group/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update group name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Update Group Chat",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.UpdateGroupChatRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/group/{id}/participants": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Add members to group",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Add Group Participants",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.AddParticipantsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/group/{id}/participants/{memberID}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove a member from group",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Remove Group Participant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Member ID",
+                        "name": "memberID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/inbound": {
+            "post": {
+                "description": "Receive a message from external subscriber",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Receive Inbound Message",
+                "parameters": [
+                    {
+                        "description": "Message Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.InboundMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/{id}": {
+            "get": {
+                "description": "List messages in a conversation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Get Conversation Thread",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/assign": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assign a conversation to an agent",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Assign Conversation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Assignee Data",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.AssignConversationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/messages": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Agent replies to a conversation pool",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Reply to Conversation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Message Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/notes": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Add an internal note to a conversation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Add Internal Note",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Note Content",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.InternalNoteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark all messages in thread as read",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Mark Thread Read",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/resolve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark conversation as resolved",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Resolve Conversation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/unassign": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return conversation to the pool (unassigned)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Unassign Conversation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/environments/{id}/api-keys": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "List API Keys",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Env ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/environments/{id}/api-keys/rotate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revokes all old keys and generates a new one",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "Rotate API Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Env ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Key data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.RotateKeyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyFullResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check the health status of the system and its dependencies",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "System health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_apps_controller.HealthResponse"
                         }
                     }
                 }
@@ -1644,6 +2547,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/system/environments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "List system environments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.SystemEnvironmentResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/tenants": {
             "get": {
                 "security": [
@@ -1960,6 +2893,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -2191,6 +3129,15 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
@@ -2337,6 +3284,62 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "CONVERDA_internal_apps_controller_dto.APIKeyFullResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "plain_key": {
+                    "description": "Only returned once on creation/rotation",
+                    "type": "string"
+                },
+                "prefix": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "suffix": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.APIKeyResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "prefix": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "suffix": {
+                    "type": "string"
+                }
+            }
+        },
         "CONVERDA_internal_apps_controller_dto.AppResponse": {
             "type": "object",
             "properties": {
@@ -2441,10 +3444,6 @@ const docTemplate = `{
         "CONVERDA_internal_apps_controller_dto.EnvironmentResponse": {
             "type": "object",
             "properties": {
-                "api_key": {
-                    "description": "Show only once optionally? For now showing it.",
-                    "type": "string"
-                },
                 "app_id": {
                     "type": "string"
                 },
@@ -2456,6 +3455,12 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyResponse"
+                    }
                 }
             }
         },
@@ -2488,6 +3493,31 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.RotateKeyRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.SystemEnvironmentResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -2593,6 +3623,9 @@ const docTemplate = `{
                 "user_id"
             ],
             "properties": {
+                "app_id": {
+                    "type": "string"
+                },
                 "role_id": {
                     "type": "string"
                 },
@@ -2615,8 +3648,12 @@ const docTemplate = `{
         "CONVERDA_internal_iam_controller_dto.AuthResponse": {
             "type": "object",
             "properties": {
+                "refresh_token": {
+                    "description": "Refresh Token",
+                    "type": "string"
+                },
                 "token": {
-                    "description": "JWT token if applicable",
+                    "description": "Access Token",
                     "type": "string"
                 },
                 "user": {
@@ -2707,6 +3744,9 @@ const docTemplate = `{
                 "email"
             ],
             "properties": {
+                "app_id": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -2777,6 +3817,17 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_iam_controller_dto.RefreshTokenRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "CONVERDA_internal_iam_controller_dto.RegisterRequest": {
             "type": "object",
             "required": [
@@ -2831,6 +3882,9 @@ const docTemplate = `{
         "CONVERDA_internal_iam_controller_dto.TenantInvitationResponse": {
             "type": "object",
             "properties": {
+                "app_id": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -2857,6 +3911,9 @@ const docTemplate = `{
         "CONVERDA_internal_iam_controller_dto.TenantMemberResponse": {
             "type": "object",
             "properties": {
+                "app_id": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -2963,6 +4020,281 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_messaging_controller_dto.AddParticipantsRequest": {
+            "type": "object",
+            "required": [
+                "participants"
+            ],
+            "properties": {
+                "participants": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantDTO"
+                    }
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.AgentStatsResponse": {
+            "type": "object",
+            "properties": {
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "current_open_threads": {
+                    "type": "integer"
+                },
+                "member_id": {
+                    "type": "string"
+                },
+                "total_assigned": {
+                    "type": "integer"
+                },
+                "total_resolved": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.AssignConversationRequest": {
+            "type": "object",
+            "properties": {
+                "member_id": {
+                    "description": "Optional, if empty assigns to caller",
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.BulkAssignRequest": {
+            "type": "object",
+            "required": [
+                "thread_ids"
+            ],
+            "properties": {
+                "member_id": {
+                    "description": "Optional",
+                    "type": "string"
+                },
+                "thread_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.CreateDirectChatRequest": {
+            "type": "object",
+            "required": [
+                "target"
+            ],
+            "properties": {
+                "target": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantDTO"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.CreateGroupChatRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "participants"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "participants": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantDTO"
+                    }
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.InboundMessageRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "environment_id",
+                "subscriber_key"
+            ],
+            "properties": {
+                "content": {
+                    "type": "object"
+                },
+                "environment_id": {
+                    "type": "string"
+                },
+                "subscriber_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.InternalNoteRequest": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "content": {
+                    "type": "object"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "object"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "string"
+                },
+                "sender_type": {
+                    "type": "string"
+                },
+                "thread_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.Meta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.PaginatedResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "meta": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.Meta"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.ParticipantDTO": {
+            "type": "object",
+            "required": [
+                "id",
+                "type"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "user",
+                        "subscriber"
+                    ]
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.ParticipantResponse": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "entity_id": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "content": {
+                    "type": "object"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.TeamStatsResponse": {
+            "type": "object",
+            "properties": {
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "resolved_count": {
+                    "type": "integer"
+                },
+                "sla_compliance_rate": {
+                    "type": "number"
+                },
+                "total_conversations": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.ThreadResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "environment_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "participants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ParticipantResponse"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.UpdateGroupChatRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "CONVERDA_internal_r2_service_dto.ImageDTO": {
             "type": "object",
             "required": [
@@ -3038,6 +4370,23 @@ const docTemplate = `{
                 },
                 "statusCode": {
                     "type": "integer"
+                }
+            }
+        },
+        "internal_apps_controller.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         }

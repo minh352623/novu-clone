@@ -13,14 +13,23 @@ import (
 )
 
 type appServiceImpl struct {
-	appRepo repository.AppRepository
-	envRepo repository.EnvironmentRepository
+	appRepo       repository.AppRepository
+	envRepo       repository.EnvironmentRepository
+	systemEnvServ service.SystemEnvironmentService
+	apiKeyServ    service.APIKeyService
 }
 
-func NewAppService(appRepo repository.AppRepository, envRepo repository.EnvironmentRepository) service.AppService {
+func NewAppService(
+	appRepo repository.AppRepository,
+	envRepo repository.EnvironmentRepository,
+	systemEnvServ service.SystemEnvironmentService,
+	apiKeyServ service.APIKeyService,
+) service.AppService {
 	return &appServiceImpl{
-		appRepo: appRepo,
-		envRepo: envRepo,
+		appRepo:       appRepo,
+		envRepo:       envRepo,
+		systemEnvServ: systemEnvServ,
+		apiKeyServ:    apiKeyServ,
 	}
 }
 
@@ -35,13 +44,28 @@ func (s *appServiceImpl) CreateApp(ctx context.Context, tenantID uuid.UUID, name
 		return nil, fmt.Errorf("failed to create app: %w", err)
 	}
 
-	// Auto-create default environments
-	defaultEnvs := []string{"development", "staging", "production"}
-	for _, code := range defaultEnvs {
-		env, err := entity.NewEnvironment(createdApp.ID, code)
-		if err == nil {
-			_, _ = s.envRepo.Create(ctx, env)
+	// Auto-create default environments from database
+	systemEnvs, err := s.systemEnvServ.ListAll(ctx)
+	if err == nil {
+		for _, se := range systemEnvs {
+			env, err := entity.NewEnvironment(createdApp.ID, se.Code)
+			if err != nil {
+				continue
+			}
+			createdEnv, err := s.envRepo.Create(ctx, env)
+			if err != nil {
+				fmt.Printf("Warning: failed to auto-create environment %s: %v\n", se.Code, err)
+				continue
+			}
+
+			// Auto-generate default API Key for the environment
+			_, _, err = s.apiKeyServ.GenerateKey(ctx, createdEnv.ID, "Default Key")
+			if err != nil {
+				fmt.Printf("Warning: failed to auto-generate default API Key for environment %s: %v\n", se.Code, err)
+			}
 		}
+	} else {
+		fmt.Printf("Warning: failed to fetch system environments for auto-provisioning: %v\n", err)
 	}
 
 	return createdApp, nil

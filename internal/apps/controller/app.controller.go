@@ -12,14 +12,26 @@ import (
 )
 
 type AppController struct {
-	appService service.AppService
-	envService service.EnvironmentService
+	appService       service.AppService
+	envService       service.EnvironmentService
+	apiKeyService    service.APIKeyService
+	metricsService   service.MetricsService
+	systemEnvService service.SystemEnvironmentService
 }
 
-func NewAppController(appService service.AppService, envService service.EnvironmentService) *AppController {
+func NewAppController(
+	appService service.AppService,
+	envService service.EnvironmentService,
+	apiKeyService service.APIKeyService,
+	metricsService service.MetricsService,
+	systemEnvService service.SystemEnvironmentService,
+) *AppController {
 	return &AppController{
-		appService: appService,
-		envService: envService,
+		appService:       appService,
+		envService:       envService,
+		apiKeyService:    apiKeyService,
+		metricsService:   metricsService,
+		systemEnvService: systemEnvService,
 	}
 }
 
@@ -32,6 +44,7 @@ func NewAppController(appService service.AppService, envService service.Environm
 // @Param request body dto.CreateAppRequest true "App data"
 // @Success 201 {object} dto.AppResponse
 // @Router /tenants/{id}/apps [post]
+// @Security BearerAuth
 func (c *AppController) CreateApp(ctx *gin.Context) (interface{}, error) {
 	tenantID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
@@ -217,4 +230,124 @@ func (c *AppController) ListEnvironments(ctx *gin.Context) (interface{}, error) 
 	}
 
 	return dto.ToEnvironmentResponseList(envs), nil
+}
+
+// ListAPIKeys godoc
+// @Summary List API Keys
+// @Tags Apps
+// @Produce json
+// @Param id path string true "Env ID"
+// @Success 200 {array} dto.APIKeyResponse
+// @Router /environments/{id}/api-keys [get]
+// @Security BearerAuth
+func (c *AppController) ListAPIKeys(ctx *gin.Context) (interface{}, error) {
+	envID, err := uuid.Parse(ctx.Param("id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid environment ID", err)
+	}
+
+	keys, err := c.apiKeyService.ListKeys(ctx.Request.Context(), envID)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return dto.ToAPIKeyResponseList(keys), nil // Still need ToAPIKeyResponseList in DTO
+}
+
+// RotateAPIKey godoc
+// @Summary Rotate API Key
+// @Description Revokes all old keys and generates a new one
+// @Tags Apps
+// @Accept json
+// @Produce json
+// @Param id path string true "Env ID"
+// @Param request body dto.RotateKeyRequest true "Key data"
+// @Success 200 {object} dto.APIKeyFullResponse
+// @Router /environments/{id}/api-keys/rotate [post]
+// @Security BearerAuth
+func (c *AppController) RotateAPIKey(ctx *gin.Context) (interface{}, error) {
+	envID, err := uuid.Parse(ctx.Param("id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid environment ID", err)
+	}
+
+	var req dto.RotateKeyRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	plainKey, key, err := c.apiKeyService.RotateKey(ctx.Request.Context(), envID, req.Name)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	resp := dto.APIKeyFullResponse{
+		APIKeyResponse: *dto.ToAPIKeyResponse(key),
+		PlainKey:       plainKey,
+	}
+
+	return resp, nil
+}
+
+// RevokeAPIKey godoc
+// @Summary Revoke API Key
+// @Tags Apps
+// @Param key_id path string true "Key ID"
+// @Success 200 {object} map[string]string
+// @Router /api-keys/{key_id}/revoke [post]
+// @Security BearerAuth
+func (c *AppController) RevokeAPIKey(ctx *gin.Context) (interface{}, error) {
+	keyID, err := uuid.Parse(ctx.Param("key_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid key ID", err)
+	}
+
+	if err := c.apiKeyService.RevokeKey(ctx.Request.Context(), keyID); err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return gin.H{"message": "API Key revoked"}, nil
+}
+
+// GetAppMetrics godoc
+// @Summary Get App usage metrics
+// @Tags Apps
+// @Produce json
+// @Param app_id path string true "App ID"
+// @Param days query int false "Days to look back"
+// @Success 200 {object} map[string]int64
+// @Router /apps/{app_id}/metrics [get]
+// @Security BearerAuth
+func (c *AppController) GetAppMetrics(ctx *gin.Context) (interface{}, error) {
+	appID, err := uuid.Parse(ctx.Param("app_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid app ID", err)
+	}
+
+	days := 30
+	// Optional: parse days from query
+
+	metrics, err := c.metricsService.GetAppMetrics(ctx.Request.Context(), appID, days)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return metrics, nil
+}
+
+// ListSystemEnvironments godoc
+// @Summary List system environments
+// @Tags System
+// @Produce json
+// @Success 200 {array} dto.SystemEnvironmentResponse
+// @Security BearerAuth
+// @Router /system/environments [get]
+// @Security BearerAuth
+func (c *AppController) ListSystemEnvironments(ctx *gin.Context) (interface{}, error) {
+	envs, err := c.systemEnvService.ListAll(ctx.Request.Context())
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return dto.ToSystemEnvironmentResponseList(envs), nil
 }

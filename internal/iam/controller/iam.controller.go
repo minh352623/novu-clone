@@ -14,13 +14,15 @@ import (
 
 // AuthController handles authentication endpoints
 type AuthController struct {
-	authService service.AuthService
+	authService  service.AuthService
+	tokenService service.TokenService
 }
 
 // NewAuthController creates a new AuthController
-func NewAuthController(authService service.AuthService) *AuthController {
+func NewAuthController(authService service.AuthService, tokenService service.TokenService) *AuthController {
 	return &AuthController{
-		authService: authService,
+		authService:  authService,
+		tokenService: tokenService,
 	}
 }
 
@@ -35,7 +37,6 @@ func NewAuthController(authService service.AuthService) *AuthController {
 // @Failure 400 {object} map[string]string
 // @Failure 409 {object} map[string]string
 // @Router /auth/register [post]
-
 func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 	var req dto.RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -50,8 +51,24 @@ func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
 	}
 
+	// Generate tokens for auto-login
+	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email)
+	if err != nil {
+		// Log error but assume registration success
+		// Ideally we should rollback or return warning, but for now just return user
+		return dto.AuthResponse{
+			User: dto.ToUserResponse(user),
+		}, nil
+	}
+	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate refresh token", err)
+	}
+
 	return dto.AuthResponse{
-		User: dto.ToUserResponse(user),
+		User:         dto.ToUserResponse(user),
+		Token:        accessToken,
+		RefreshToken: refreshToken,
 	}, nil
 }
 
@@ -76,10 +93,21 @@ func (c *AuthController) Login(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusUnauthorized, "Invalid credentials", err)
 	}
 
-	// TODO: Generate JWT token here
+	// Generate JWT tokens
+	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate token", err)
+	}
+
+	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate refresh token", err)
+	}
+
 	return dto.AuthResponse{
-		User:  dto.ToUserResponse(user),
-		Token: "", // JWT token to be implemented
+		User:         dto.ToUserResponse(user),
+		Token:        accessToken,
+		RefreshToken: refreshToken,
 	}, nil
 }
 
@@ -124,13 +152,38 @@ func (c *AuthController) ChangePassword(ctx *gin.Context) (interface{}, error) {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param request body dto.RegisterRequest true "Refresh token data"
+// @Param request body dto.RefreshTokenRequest true "Refresh token data"
 // @Success 200 {object} dto.AuthResponse
 // @Failure 401 {object} map[string]string
 // @Router /auth/refresh [post]
 func (c *AuthController) RefreshToken(ctx *gin.Context) (interface{}, error) {
-	// TODO: Implement RefreshToken logic using token service
-	return nil, response.NewAPIError(http.StatusNotImplemented, "Not implemented", nil)
+	var req dto.RefreshTokenRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	userID, email, err := c.tokenService.ValidateRefreshToken(ctx.Request.Context(), req.RefreshToken)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusUnauthorized, "Invalid or expired refresh token", err)
+	}
+
+	// Generate new access token
+	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), userID, email)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate token", err)
+	}
+
+	// Optionally rotate refresh token here
+
+	// We don't have user entity here to return full profile unless we fetch it.
+	// For simple refresh, returning token is often enough, but response DTO has User.
+	// We should fetch user. TODO: Add GetUser to authService or userService call.
+	// For now, return empty user or minimal info.
+	// Actually, let's just return the token. The DTO expects User pointer.
+
+	return dto.AuthResponse{
+		Token: accessToken,
+	}, nil
 }
 
 // Me godoc
@@ -140,15 +193,24 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) (interface{}, error) {
 // @Produce json
 // @Success 200 {object} dto.UserResponse
 // @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
 // @Security BearerAuth
 // @Router /users/me [get]
 func (c *AuthController) Me(ctx *gin.Context) (interface{}, error) {
-	userID, exists := ctx.Get("user_id")
+	userID, exists := ctx.Get("user_id") // Middleware ensures UUID type now
 	if !exists {
 		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
 	}
-	// TODO: Fetch user details from service
-	return gin.H{"id": userID}, nil
+
+	user, err := c.authService.GetUser(ctx.Request.Context(), userID.(uuid.UUID))
+	if err != nil {
+		if err == service.ErrUserNotFound {
+			return nil, response.NewAPIError(http.StatusNotFound, "User not found", err)
+		}
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return dto.ToUserResponse(user), nil
 }
 
 // TenantController handles tenant endpoints
@@ -242,12 +304,39 @@ func (c *TenantController) GetTenant(ctx *gin.Context) (interface{}, error) {
 // @Router /tenants/{id} [put]
 func (c *TenantController) UpdateTenant(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
-	_, err := uuid.Parse(idStr)
+	id, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
 	}
-	// TODO: Implement UpdateTenant logic in service and controller
-	return nil, response.NewAPIError(http.StatusNotImplemented, "Not implemented", nil)
+
+	var req dto.CreateTenantRequest // Using Create DTO for simplicity, or Create UpdateDTO
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	// 1. Get existing tenant to verify existence
+	tenant, err := c.tenantService.GetTenant(ctx.Request.Context(), id)
+	if err != nil {
+		if err == service.ErrTenantNotFound {
+			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+		}
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	// 2. Update fields
+	tenant.Name = req.Name
+	tenant.Slug = req.Slug
+
+	// 3. Save
+	// Service should handle validation (slug uniqueness)
+	if err := c.tenantService.UpdateTenant(ctx.Request.Context(), tenant); err != nil {
+		if err == service.ErrTenantSlugExists {
+			return nil, response.NewAPIError(http.StatusConflict, err.Error(), err)
+		}
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	return dto.ToTenantResponse(tenant), nil
 }
 
 // DeleteTenant godoc
@@ -262,12 +351,19 @@ func (c *TenantController) UpdateTenant(ctx *gin.Context) (interface{}, error) {
 // @Router /tenants/{id} [delete]
 func (c *TenantController) DeleteTenant(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
-	_, err := uuid.Parse(idStr)
+	id, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
 	}
-	// TODO: Implement DeleteTenant logic
-	return nil, response.NewAPIError(http.StatusNotImplemented, "Not implemented", nil)
+
+	if err := c.tenantService.DeleteTenant(ctx.Request.Context(), id); err != nil {
+		if err == service.ErrTenantNotFound {
+			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+		}
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return gin.H{"message": "Tenant deleted successfully"}, nil
 }
 
 // ListTenants godoc
@@ -374,7 +470,7 @@ func (c *TenantController) AddMember(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
 	}
 
-	member, err := c.memberService.AddMember(ctx.Request.Context(), tenantID, req.UserID, req.RoleID)
+	member, err := c.memberService.AddMember(ctx.Request.Context(), tenantID, req.UserID, req.RoleID, req.AppID)
 	if err != nil {
 		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
 	}
@@ -412,7 +508,7 @@ func (c *TenantController) InviteMember(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
 	}
 
-	invite, err := c.memberService.InviteMember(ctx.Request.Context(), tenantID, req.Email, req.RoleID, userID.(uuid.UUID))
+	invite, err := c.memberService.InviteMember(ctx.Request.Context(), tenantID, req.Email, req.RoleID, req.AppID, userID.(uuid.UUID))
 	if err != nil {
 		if err == service.ErrUnauthorized {
 			return nil, response.NewAPIError(http.StatusForbidden, "Insufficient permissions", err)

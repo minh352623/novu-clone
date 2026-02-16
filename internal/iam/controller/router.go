@@ -47,6 +47,8 @@ func RegisterIAMRoutes(
 		// Create tenant doesn't require membership (user is creating new tenant)
 		tenantGroup.POST("", response.Wrap(tenantController.CreateTenant, http.StatusCreated))
 		tenantGroup.GET("", response.Wrap(tenantController.ListTenants, http.StatusOK))
+		// Get my tenants - MUST BE BEFORE /:id
+		tenantGroup.GET("/me", response.Wrap(tenantController.GetMyTenants, http.StatusOK))
 	}
 
 	// Tenant-specific routes (require membership + permissions)

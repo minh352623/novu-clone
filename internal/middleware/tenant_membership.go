@@ -20,10 +20,12 @@ const (
 // MembershipChecker interface for checking tenant membership
 type MembershipChecker interface {
 	GetMemberByTenantAndUser(ctx context.Context, tenantID, userID uuid.UUID) (memberID uuid.UUID, roleID *uuid.UUID, err error)
+	// GetMemberByTenantUserAndApp checks membership for a specific app (or tenant-wide if appID is nil).
+	GetMemberByTenantUserAndApp(ctx context.Context, tenantID, userID uuid.UUID, appID *uuid.UUID) (memberID uuid.UUID, roleID *uuid.UUID, err error)
 }
 
 // TenantMembershipMiddleware checks if the authenticated user is a member of the tenant
-// It extracts tenant_id from query param or URL param and validates membership
+// It extracts tenant_id (and optional app_id) from query param or URL param and validates membership
 func TenantMembershipMiddleware(checker MembershipChecker) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// Get user ID from context (set by AuthMiddleware)
@@ -37,24 +39,44 @@ func TenantMembershipMiddleware(checker MembershipChecker) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := userIDVal.(int64)
-		if !ok {
+		// Try to get UUID directly if available (best effort)
+		var userUUID uuid.UUID
+		var err error
+
+		userUUIDStr := ctx.GetString("user_uuid")
+		if userUUIDStr != "" {
+			userUUID, err = uuid.Parse(userUUIDStr)
+		} else {
+			// Fallback: Check if userIDVal is already UUID
+			if id, ok := userIDVal.(uuid.UUID); ok {
+				userUUID = id
+			} else {
+				// If it's int64 or something else and we can't get UUID, fail
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(
+					http.StatusUnauthorized,
+					"Unauthorized",
+					"User UUID not found",
+				))
+				return
+			}
+		}
+
+		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(
 				http.StatusUnauthorized,
 				"Unauthorized",
-				"Invalid user ID type in context",
+				"Invalid User UUID",
 			))
 			return
 		}
-		_ = userID // TODO: Convert int64 to UUID for membership check
 
 		// Get tenant_id from query or URL param
 		tenantIDStr := ctx.Query("tenant_id")
 		if tenantIDStr == "" {
-			tenantIDStr = ctx.Param("id") // For routes like /tenants/:id/apps
+			tenantIDStr = ctx.Param("id")
 		}
 		if tenantIDStr == "" {
-			tenantIDStr = ctx.Param("tenant_id") // Alternative param name
+			tenantIDStr = ctx.Param("tenant_id")
 		}
 
 		if tenantIDStr == "" {
@@ -76,19 +98,28 @@ func TenantMembershipMiddleware(checker MembershipChecker) gin.HandlerFunc {
 			return
 		}
 
-		// Check membership
-		// Note: We need to convert int64 userID to uuid.UUID
-		// For now, we'll create a UUID from the int64 (this should be updated based on actual user ID type)
-		userUUID, err := uuid.Parse(ctx.GetString("user_uuid"))
-		if err != nil {
-			// If user_uuid is not set, we need to handle this differently
-			// For now, skip membership check if we can't get UUID
-			ctx.Set(ContextKeyTenantID, tenantID)
-			ctx.Next()
-			return
+		// Get app_id from query or URL param (Optional)
+		appIDStr := ctx.Query("app_id")
+		if appIDStr == "" {
+			appIDStr = ctx.Param("app_id")
 		}
 
-		memberID, roleID, err := checker.GetMemberByTenantAndUser(ctx.Request.Context(), tenantID, userUUID)
+		var appID *uuid.UUID
+		if appIDStr != "" {
+			id, err := uuid.Parse(appIDStr)
+			if err != nil {
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, response.NewAPIError(
+					http.StatusBadRequest,
+					"Bad Request",
+					"Invalid app ID format",
+				))
+				return
+			}
+			appID = &id
+		}
+
+		// Check membership with optional appID
+		memberID, roleID, err := checker.GetMemberByTenantUserAndApp(ctx.Request.Context(), tenantID, userUUID, appID)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusForbidden, response.NewAPIError(
 				http.StatusForbidden,

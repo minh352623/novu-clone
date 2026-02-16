@@ -60,14 +60,17 @@ func (s *tenantServiceImpl) CreateTenant(ctx context.Context, name, slug string,
 	}
 
 	// Get tenant_admin role
-	adminRole, _ := s.roleRepo.GetBySlug(ctx, entity.RoleTenantAdmin)
+	adminRole, err := s.roleRepo.GetBySlug(ctx, entity.RoleTenantAdmin)
 	var roleID *uuid.UUID
-	if adminRole != nil {
+	if err == nil && adminRole != nil {
 		roleID = &adminRole.ID
+	} else {
+		// Log error - this should not happen if migration 00016 ran
+		fmt.Printf("Warning: Default admin role %s not found in database. Tenant owner will have no role.\n", entity.RoleTenantAdmin)
 	}
 
 	// Add owner as admin member
-	member, err := entity.NewTenantMember(createdTenant.ID, ownerUserID, roleID)
+	member, err := entity.NewTenantMember(createdTenant.ID, ownerUserID, roleID, nil) // nil appID
 	if err != nil {
 		return nil, fmt.Errorf("failed to create member: %w", err)
 	}

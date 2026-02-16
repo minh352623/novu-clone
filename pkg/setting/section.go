@@ -1,13 +1,14 @@
 package setting
 
 type Config struct {
-	Server        ServerSetting        `mapstructure:"server"`
-	Logger        LoggerSetting        `mapstructure:"logger"`
-	Postgresql    PostgresqlSetting    `mapstructure:"postgresql"`
-	Mail          MailSetting          `mapstructure:"mail"`
-	Auth          AuthSetting          `mapstructure:"auth"`
-	R2            R2Setting            `mapstructure:"r2"`
-	Notification  NotificationSetting  `mapstructure:"notification"`
+	Server       ServerSetting       `mapstructure:"server"`
+	Logger       LoggerSetting       `mapstructure:"logger"`
+	Postgresql   PostgresqlSetting   `mapstructure:"postgresql"`
+	Mail         MailSetting         `mapstructure:"mail"`
+	Auth         AuthSetting         `mapstructure:"auth"`
+	R2           R2Setting           `mapstructure:"r2"`
+	Notification NotificationSetting `mapstructure:"notification"`
+	SES          SESSetting          `mapstructure:"ses"`
 }
 
 type AuthSetting struct {
@@ -78,4 +79,11 @@ type SMSSetting struct {
 	AccountSID string `mapstructure:"account_sid"`
 	AuthToken  string `mapstructure:"auth_token"`
 	FromNumber string `mapstructure:"from_number"`
+}
+
+type SESSetting struct {
+	Region          string `mapstructure:"region"`
+	AccessKeyId     string `mapstructure:"access_key_id"`
+	SecretAccessKey string `mapstructure:"secret_access_key"`
+	FromEmail       string `mapstructure:"from_email"`
 }

@@ -46,14 +46,22 @@ func ToEnvironmentEntity(m *model.EnvironmentModel) *entity.Environment {
 	if m == nil {
 		return nil
 	}
-	return &entity.Environment{
+	env := &entity.Environment{
 		ID:              m.ID,
 		AppID:           m.AppID,
 		EnvironmentCode: m.EnvironmentCode,
-		APIKey:          m.APIKey,
 		CreatedAt:       m.CreatedAt,
 		UpdatedAt:       m.UpdatedAt,
 	}
+
+	if len(m.Keys) > 0 {
+		env.Keys = make([]*entity.APIKey, len(m.Keys))
+		for i, k := range m.Keys {
+			env.Keys[i] = ToAPIKeyEntity(&k)
+		}
+	}
+
+	return env
 }
 
 func ToEnvironmentModel(e *entity.Environment) *model.EnvironmentModel {
@@ -64,9 +72,46 @@ func ToEnvironmentModel(e *entity.Environment) *model.EnvironmentModel {
 		ID:              e.ID,
 		AppID:           e.AppID,
 		EnvironmentCode: e.EnvironmentCode,
-		APIKey:          e.APIKey,
 		CreatedAt:       e.CreatedAt,
 		UpdatedAt:       e.UpdatedAt,
+	}
+}
+
+func ToAPIKeyEntity(m *model.APIKeyModel) *entity.APIKey {
+	if m == nil {
+		return nil
+	}
+	return &entity.APIKey{
+		ID:            m.ID,
+		AppID:         m.AppID,
+		EnvironmentID: m.EnvironmentID,
+		KeyHash:       m.KeyHash,
+		KeyPrefix:     m.KeyPrefix,
+		KeySuffix:     m.KeySuffix,
+		Name:          m.Name,
+		ExpiresAt:     m.ExpiresAt,
+		RevokedAt:     m.RevokedAt,
+		CreatedAt:     m.CreatedAt,
+		UpdatedAt:     m.UpdatedAt,
+	}
+}
+
+func ToAPIKeyModel(e *entity.APIKey) *model.APIKeyModel {
+	if e == nil {
+		return nil
+	}
+	return &model.APIKeyModel{
+		ID:            e.ID,
+		AppID:         e.AppID,
+		EnvironmentID: e.EnvironmentID,
+		KeyHash:       e.KeyHash,
+		KeyPrefix:     e.KeyPrefix,
+		KeySuffix:     e.KeySuffix,
+		Name:          e.Name,
+		ExpiresAt:     e.ExpiresAt,
+		RevokedAt:     e.RevokedAt,
+		CreatedAt:     e.CreatedAt,
+		UpdatedAt:     e.UpdatedAt,
 	}
 }
 

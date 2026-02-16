@@ -13,6 +13,7 @@ type TenantMember struct {
 	TenantID  uuid.UUID  `json:"tenant_id"`
 	UserID    uuid.UUID  `json:"user_id"`
 	RoleID    *uuid.UUID `json:"role_id,omitempty"`
+	AppID     *uuid.UUID `json:"app_id,omitempty"` // Nullable: tenant-level permission
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 
@@ -30,7 +31,7 @@ var (
 )
 
 // NewTenantMember creates a new tenant member
-func NewTenantMember(tenantID, userID uuid.UUID, roleID *uuid.UUID) (*TenantMember, error) {
+func NewTenantMember(tenantID, userID uuid.UUID, roleID, appID *uuid.UUID) (*TenantMember, error) {
 	if tenantID == uuid.Nil {
 		return nil, ErrMemberTenantRequired
 	}
@@ -44,6 +45,7 @@ func NewTenantMember(tenantID, userID uuid.UUID, roleID *uuid.UUID) (*TenantMemb
 		TenantID:  tenantID,
 		UserID:    userID,
 		RoleID:    roleID,
+		AppID:     appID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil

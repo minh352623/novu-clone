@@ -19,14 +19,13 @@ var (
 
 // Claims represents custom JWT claims
 type Claims struct {
-	UserId   int64  `json:"userId"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	UserId string `json:"userId"` // Changed to string for UUID
+	Email  string `json:"email"`
 	jwt.RegisteredClaims
 }
 
 // GenerateAccessToken generates a new access token
-func GenerateAccessToken(userId int64, username, email string) (string, int64, error) {
+func GenerateAccessToken(userId string, email string) (string, int64, error) {
 	expiresIn, err := time.ParseDuration(global.Config.Auth.JwtExpiresIn)
 	if err != nil {
 		// Fallback to default 15 minutes if parsing fails
@@ -35,15 +34,14 @@ func GenerateAccessToken(userId int64, username, email string) (string, int64, e
 	expiresAt := time.Now().Add(expiresIn)
 
 	claims := &Claims{
-		UserId:   userId,
-		Username: username,
-		Email:    email,
+		UserId: userId,
+		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "service-setting",
-			Subject:   fmt.Sprintf("%d", userId),
+			Issuer:    "converda-service",
+			Subject:   userId,
 		},
 	}
 
@@ -57,7 +55,7 @@ func GenerateAccessToken(userId int64, username, email string) (string, int64, e
 }
 
 // GenerateRefreshToken generates a new refresh token
-func GenerateRefreshToken(userId int64, username, email string) (string, time.Time, error) {
+func GenerateRefreshToken(userId string, email string) (string, time.Time, error) {
 	expiresIn, err := time.ParseDuration(global.Config.Auth.JwtRefreshExpiresIn)
 	if err != nil {
 		// Fallback to default 24 hours if parsing fails
@@ -66,15 +64,14 @@ func GenerateRefreshToken(userId int64, username, email string) (string, time.Ti
 	expiresAt := time.Now().Add(expiresIn)
 
 	claims := &Claims{
-		UserId:   userId,
-		Username: username,
-		Email:    email,
+		UserId: userId,
+		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "service-setting",
-			Subject:   fmt.Sprintf("%d", userId),
+			Issuer:    "converda-service",
+			Subject:   userId,
 		},
 	}
 

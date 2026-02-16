@@ -87,6 +87,23 @@ func (s *r2Service) UploadFileBase64(ctx context.Context, images []dto.ImageDTO)
 		wg.Add(1)
 		go func(index int, image dto.ImageDTO) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					// Log the panic (assuming usage of global logger or similar mechanism if available,
+					// or just ensure wg.Done is called which is covered above)
+					fmt.Printf("Recovered from panic in UploadFileBase64 goroutine: %v\n", r)
+
+					// Record failure for this item
+					mu.Lock()
+					response.Results[index] = dto.UploadResult{
+						Key:     image.Key,
+						Success: false,
+						Error:   fmt.Sprintf("internal server error: panic recovered: %v", r),
+					}
+					response.FailedCount++
+					mu.Unlock()
+				}
+			}()
 
 			result := dto.UploadResult{
 				Key: image.Key,

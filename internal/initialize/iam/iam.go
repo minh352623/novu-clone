@@ -4,8 +4,11 @@ import (
 	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service/impl"
 	"CONVERDA/internal/iam/controller"
+	"CONVERDA/internal/iam/infrastructure/email"
 	"CONVERDA/internal/iam/infrastructure/persistence/repository"
 	"CONVERDA/internal/middleware"
+
+	"go.uber.org/zap"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,11 +26,17 @@ func InitIAMModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	pricingPlanRepo := repository.NewPricingPlanRepository(db)
 
 	// Initialize services
+	emailService, err := email.NewSESEmailService(global.Config.SES)
+	if err != nil {
+		global.Logger.Fatal("Failed to initialize SES email service", zap.Error(err))
+	}
+
 	authService := impl.NewAuthService(userRepo)
 	tenantService := impl.NewTenantService(tenantRepo, memberRepo, roleRepo, pricingPlanRepo)
-	memberService := impl.NewMemberService(memberRepo, roleRepo, invitationRepo)
+	memberService := impl.NewMemberService(memberRepo, roleRepo, tenantRepo, invitationRepo, emailService)
 	roleService := impl.NewRoleService(roleRepo)
 	pricingPlanService := impl.NewPricingPlanService(pricingPlanRepo)
+	tokenService := impl.NewTokenService()
 
 	// Middleware Adapters
 	membershipChecker := middleware.NewMembershipCheckerAdapter(memberRepo)
@@ -35,9 +44,9 @@ func InitIAMModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	tenantMembershipMiddleware := middleware.TenantMembershipMiddleware(membershipChecker)
 
 	// Controllers
-	authController := controller.NewAuthController(authService)
+	authController := controller.NewAuthController(authService, tokenService)
 	tenantController := controller.NewTenantController(tenantService, memberService)
-	roleController := controller.NewRoleController(roleService)
+	roleController := controller.NewRoleController(roleService, memberService)
 	pricingPlanController := controller.NewPricingPlanController(pricingPlanService)
 
 	// Register Routes using the controller's register function

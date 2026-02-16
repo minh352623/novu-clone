@@ -33,6 +33,32 @@ func (a *MembershipCheckerAdapter) GetMemberByTenantAndUser(ctx context.Context,
 	return member.ID, member.RoleID, nil
 }
 
+// GetMemberByTenantUserAndApp implements MembershipChecker interface
+func (a *MembershipCheckerAdapter) GetMemberByTenantUserAndApp(ctx context.Context, tenantID, userID uuid.UUID, appID *uuid.UUID) (memberID uuid.UUID, roleID *uuid.UUID, err error) {
+	// 1. Try App-Specific Membership
+	member, err := a.memberRepo.GetByTenantUserAndApp(ctx, tenantID, userID, appID)
+	if err != nil {
+		return uuid.Nil, nil, fmt.Errorf("failed to check app membership: %w", err)
+	}
+	if member != nil {
+		return member.ID, member.RoleID, nil
+	}
+
+	// 2. Fallback to Tenant-Level (AppID = NIL)
+	// Only if AppID was requested (not nil). If AppID was already nil, first query covered it.
+	if appID != nil {
+		tenantMember, err := a.memberRepo.GetByTenantUserAndApp(ctx, tenantID, userID, nil)
+		if err != nil {
+			return uuid.Nil, nil, fmt.Errorf("failed to check tenant fallback membership: %w", err)
+		}
+		if tenantMember != nil {
+			return tenantMember.ID, tenantMember.RoleID, nil
+		}
+	}
+
+	return uuid.Nil, nil, fmt.Errorf("user is not a member")
+}
+
 // PermissionCheckerAdapter adapts RoleRepository to PermissionChecker interface
 type PermissionCheckerAdapter struct {
 	roleRepo repository.RoleRepository

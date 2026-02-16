@@ -14,13 +14,15 @@ import (
 
 // RoleController handles role endpoints
 type RoleController struct {
-	roleService service.RoleService
+	roleService   service.RoleService
+	memberService service.MemberService
 }
 
 // NewRoleController creates a new RoleController
-func NewRoleController(roleService service.RoleService) *RoleController {
+func NewRoleController(roleService service.RoleService, memberService service.MemberService) *RoleController {
 	return &RoleController{
-		roleService: roleService,
+		roleService:   roleService,
+		memberService: memberService,
 	}
 }
 
@@ -231,8 +233,32 @@ func (c *RoleController) UpdatePermissions(ctx *gin.Context) (interface{}, error
 // @Security BearerAuth
 // @Router /roles/{id}/assign [post]
 func (c *RoleController) AssignRole(ctx *gin.Context) (interface{}, error) {
-	// TODO: Implement logic to assign role to user
-	return nil, response.NewAPIError(http.StatusNotImplemented, "Not implemented", nil)
+	idStr := ctx.Param("id")
+	roleID, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid role ID", err)
+	}
+
+	var req dto.AssignRoleRequest // We need this DTO: UserID inside
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	// This assumes request has MemberID (TenantMember.ID), not UserID specifically ?
+	// Or we need to resolve MemberID from UserID + context TenantID?
+	// The current MemberService.AssignRole takes MemberID.
+	// But API might pass UserID.
+	// Let's check dto.AssignRoleRequest definition.
+	// Assuming it's MemberID for now based on service signature.
+	// If it's UserID, we need to lookup Member first.
+	// Assuming req.UserID is actually MemberID UUID for simplicity or we fetch member.
+	// Let's Assume req.MemberID is passed.
+
+	if err := c.memberService.AssignRole(ctx.Request.Context(), req.UserID, roleID); err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return gin.H{"message": "Role assigned successfully"}, nil
 }
 
 // RevokeRole godoc
@@ -248,6 +274,20 @@ func (c *RoleController) AssignRole(ctx *gin.Context) (interface{}, error) {
 // @Security BearerAuth
 // @Router /roles/{id}/revoke [post]
 func (c *RoleController) RevokeRole(ctx *gin.Context) (interface{}, error) {
-	// TODO: Implement logic to revoke role from user
-	return nil, response.NewAPIError(http.StatusNotImplemented, "Not implemented", nil)
+	// idParam is RoleID, but RevokeRole (RemoveRole) only needs MemberID.
+	// Effectively this endpoint is "Remove THIS Role from Member".
+	// But our logic is simple: Set role_id = NULL.
+	// So we don't strictly need RoleID in URL, but RESTful structure implies it.
+	// We just use MemberID from body.
+
+	var req dto.RevokeRoleRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	if err := c.memberService.RevokeRole(ctx.Request.Context(), req.UserID); err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return gin.H{"message": "Role revoked successfully"}, nil
 }

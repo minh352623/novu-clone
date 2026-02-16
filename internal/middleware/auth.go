@@ -8,13 +8,12 @@ import (
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
 	// ContextKeyUserID is the key for user ID in context
-	ContextKeyUserID = "userId"
-	// ContextKeyUsername is the key for username in context
-	ContextKeyUsername = "username"
+	ContextKeyUserID = "user_id" // Consistent with what controller uses
 	// ContextKeyEmail is the key for email in context
 	ContextKeyEmail = "email"
 )
@@ -67,8 +66,21 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Set user info in context
-		ctx.Set(ContextKeyUserID, claims.UserId)
-		ctx.Set(ContextKeyUsername, claims.Username)
+		// Parse userID string to UUID format if needed, but for now store as is or parsed UUID
+		// Controller expects UUID, so let's try to parse here or let controller parse
+		// Reviewing controller: userID, exists := ctx.Get("user_id"); userID.(uuid.UUID)
+		// So middleware MUST set uuid.UUID
+		uid, err := uuid.Parse(claims.UserId)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(
+				http.StatusUnauthorized,
+				"Unauthorized",
+				"Invalid user ID in token",
+			))
+			return
+		}
+
+		ctx.Set(ContextKeyUserID, uid)
 		ctx.Set(ContextKeyEmail, claims.Email)
 
 		ctx.Next()
@@ -76,23 +88,13 @@ func AuthMiddleware() gin.HandlerFunc {
 }
 
 // GetUserIDFromContext extracts user ID from context
-func GetUserIDFromContext(ctx *gin.Context) (int64, bool) {
+func GetUserIDFromContext(ctx *gin.Context) (uuid.UUID, bool) {
 	userId, exists := ctx.Get(ContextKeyUserID)
 	if !exists {
-		return 0, false
+		return uuid.Nil, false
 	}
-	id, ok := userId.(int64)
+	id, ok := userId.(uuid.UUID)
 	return id, ok
-}
-
-// GetUsernameFromContext extracts username from context
-func GetUsernameFromContext(ctx *gin.Context) (string, bool) {
-	username, exists := ctx.Get(ContextKeyUsername)
-	if !exists {
-		return "", false
-	}
-	name, ok := username.(string)
-	return name, ok
 }
 
 // GetEmailFromContext extracts email from context
@@ -128,9 +130,11 @@ func OptionalAuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Set user info in context
-		ctx.Set(ContextKeyUserID, claims.UserId)
-		ctx.Set(ContextKeyUsername, claims.Username)
-		ctx.Set(ContextKeyEmail, claims.Email)
+		uid, err := uuid.Parse(claims.UserId)
+		if err == nil {
+			ctx.Set(ContextKeyUserID, uid)
+			ctx.Set(ContextKeyEmail, claims.Email)
+		}
 
 		ctx.Next()
 	}

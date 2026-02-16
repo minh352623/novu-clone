@@ -39,6 +39,7 @@ func RegisterAppsRoutes(
 		apps.GET("/:app_id", response.Wrap(appController.GetApp, http.StatusOK))
 		apps.PUT("/:app_id", response.Wrap(appController.UpdateApp, http.StatusOK))
 		apps.DELETE("/:app_id", response.Wrap(appController.DeleteApp, http.StatusOK))
+		apps.GET("/:app_id/metrics", response.Wrap(appController.GetAppMetrics, http.StatusOK))
 
 		// Environments
 		apps.POST("/:app_id/environments", response.Wrap(appController.CreateEnvironment, http.StatusCreated))
@@ -51,6 +52,24 @@ func RegisterAppsRoutes(
 		// Providers
 		apps.POST("/:app_id/providers", response.Wrap(providerController.CreateProvider, http.StatusCreated))
 		apps.GET("/:app_id/providers", response.Wrap(providerController.ListProviders, http.StatusOK))
+
+		// API Keys (Environment scoped)
+		envGroup := router.Group("/environments")
+		if authMiddleware != nil {
+			envGroup.Use(authMiddleware)
+		}
+		{
+			envGroup.GET("/:id/api-keys", response.Wrap(appController.ListAPIKeys, http.StatusOK))
+			envGroup.POST("/:id/api-keys/rotate", response.Wrap(appController.RotateAPIKey, http.StatusOK))
+		}
+
+		apiKeyGroup := router.Group("/api-keys")
+		if authMiddleware != nil {
+			apiKeyGroup.Use(authMiddleware)
+		}
+		{
+			apiKeyGroup.POST("/:key_id/revoke", response.Wrap(appController.RevokeAPIKey, http.StatusOK))
+		}
 	}
 
 	// Webhook routes
@@ -73,5 +92,14 @@ func RegisterAppsRoutes(
 		providers.GET("/:provider_id", response.Wrap(providerController.GetProvider, http.StatusOK))
 		providers.PUT("/:provider_id", response.Wrap(providerController.UpdateProvider, http.StatusOK))
 		providers.DELETE("/:provider_id", response.Wrap(providerController.DeleteProvider, http.StatusOK))
+	}
+
+	// System routes
+	system := router.Group("/system")
+	if authMiddleware != nil {
+		system.Use(authMiddleware)
+	}
+	{
+		system.GET("/environments", response.Wrap(appController.ListSystemEnvironments, http.StatusOK))
 	}
 }

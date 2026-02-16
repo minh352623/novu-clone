@@ -54,4 +54,7 @@ type TenantMemberRepository interface {
 
 	// ExistsByTenantAndUser checks if a membership exists
 	ExistsByTenantAndUser(ctx context.Context, tenantID, userID uuid.UUID) (bool, error)
+
+	// GetByTenantUserAndApp checks for specific app-level membership (or tenant-level if appID is nil)
+	GetByTenantUserAndApp(ctx context.Context, tenantID, userID uuid.UUID, appID *uuid.UUID) (*entity.TenantMember, error)
 }

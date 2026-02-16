@@ -217,6 +217,7 @@ func TestNewTenantMember(t *testing.T) {
 		tenantID      uuid.UUID
 		userID        uuid.UUID
 		roleID        *uuid.UUID
+		appID         *uuid.UUID
 		expectedError error
 	}{
 		{
@@ -224,6 +225,7 @@ func TestNewTenantMember(t *testing.T) {
 			tenantID:      tenantID,
 			userID:        userID,
 			roleID:        nil,
+			appID:         nil,
 			expectedError: nil,
 		},
 		{
@@ -231,6 +233,7 @@ func TestNewTenantMember(t *testing.T) {
 			tenantID:      uuid.Nil,
 			userID:        userID,
 			roleID:        nil,
+			appID:         nil,
 			expectedError: entity.ErrMemberTenantRequired,
 		},
 		{
@@ -238,13 +241,14 @@ func TestNewTenantMember(t *testing.T) {
 			tenantID:      tenantID,
 			userID:        uuid.Nil,
 			roleID:        nil,
+			appID:         nil,
 			expectedError: entity.ErrMemberUserRequired,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			member, err := entity.NewTenantMember(tt.tenantID, tt.userID, tt.roleID)
+			member, err := entity.NewTenantMember(tt.tenantID, tt.userID, tt.roleID, tt.appID)
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)
@@ -255,6 +259,7 @@ func TestNewTenantMember(t *testing.T) {
 				assert.NotNil(t, member)
 				assert.Equal(t, tt.tenantID, member.TenantID)
 				assert.Equal(t, tt.userID, member.UserID)
+				assert.Equal(t, tt.appID, member.AppID)
 			}
 		})
 	}

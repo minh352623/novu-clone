@@ -19,13 +19,22 @@ func InitAppsModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	envRepo := repository.NewEnvironmentRepository(db)
 	webhookRepo := repository.NewWebhookRepository(db)
 	providerRepo := repository.NewProviderRepository(db)
+	apiKeyRepo := repository.NewAPIKeyRepository(db)
+	metricsRepo := repository.NewUsageMetricRepository(db)
+	systemEnvRepo := repository.NewSystemEnvironmentRepository(db)
 
 	// Repositories (IAM - for membership checking)
 	memberRepo := iamRepository.NewTenantMemberRepository(db)
 
 	// Services
-	appService := impl.NewAppService(appRepo, envRepo)
+	systemEnvService := impl.NewSystemEnvironmentService(systemEnvRepo)
+	metricsService := impl.NewMetricsService(metricsRepo)
 	envService := impl.NewEnvironmentService(envRepo)
+	apiKeyService := impl.NewAPIKeyService(apiKeyRepo, envRepo)
+
+	// AppService depends on SystemEnv and APIKey services
+	appService := impl.NewAppService(appRepo, envRepo, systemEnvService, apiKeyService)
+
 	webhookService := impl.NewWebhookService(webhookRepo)
 	providerService := impl.NewProviderService(providerRepo)
 
@@ -34,7 +43,7 @@ func InitAppsModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	tenantMembershipMiddleware := middleware.TenantMembershipMiddleware(membershipChecker)
 
 	// Controllers
-	appController := controller.NewAppController(appService, envService)
+	appController := controller.NewAppController(appService, envService, apiKeyService, metricsService, systemEnvService)
 	webhookController := controller.NewWebhookController(webhookService)
 	providerController := controller.NewProviderController(providerService)
 

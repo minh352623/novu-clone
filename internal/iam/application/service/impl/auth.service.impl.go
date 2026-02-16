@@ -96,3 +96,14 @@ func (s *authServiceImpl) ChangePassword(ctx context.Context, userID uuid.UUID, 
 
 	return nil
 }
+
+func (s *authServiceImpl) GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	if user == nil {
+		return nil, service.ErrUserNotFound
+	}
+	return user, nil
+}

@@ -51,12 +51,14 @@ type UpdateTenantRequest struct {
 type AddMemberRequest struct {
 	UserID uuid.UUID  `json:"user_id" binding:"required"`
 	RoleID *uuid.UUID `json:"role_id,omitempty"`
+	AppID  *uuid.UUID `json:"app_id,omitempty"`
 }
 
 // InviteMemberRequest represents inviting a member via email
 type InviteMemberRequest struct {
 	Email  string     `json:"email" binding:"required,email"`
 	RoleID *uuid.UUID `json:"role_id,omitempty"`
+	AppID  *uuid.UUID `json:"app_id,omitempty"`
 }
 
 // AcceptInvitationRequest represents accepting an invitation
@@ -139,8 +141,9 @@ func ToUserResponse(user *entity.User) *UserResponse {
 
 // AuthResponse represents authentication response
 type AuthResponse struct {
-	User  *UserResponse `json:"user"`
-	Token string        `json:"token,omitempty"` // JWT token if applicable
+	User         *UserResponse `json:"user"`
+	Token        string        `json:"token,omitempty"`         // Access Token
+	RefreshToken string        `json:"refresh_token,omitempty"` // Refresh Token
 }
 
 // TenantResponse represents tenant response
@@ -259,6 +262,7 @@ type TenantMemberResponse struct {
 	TenantID  uuid.UUID     `json:"tenant_id"`
 	UserID    uuid.UUID     `json:"user_id"`
 	RoleID    *uuid.UUID    `json:"role_id,omitempty"`
+	AppID     *uuid.UUID    `json:"app_id,omitempty"`
 	User      *UserResponse `json:"user,omitempty"`
 	Role      *RoleResponse `json:"role,omitempty"`
 	CreatedAt time.Time     `json:"created_at"`
@@ -270,6 +274,7 @@ type TenantInvitationResponse struct {
 	TenantID  uuid.UUID  `json:"tenant_id"`
 	Email     string     `json:"email"`
 	RoleID    *uuid.UUID `json:"role_id,omitempty"`
+	AppID     *uuid.UUID `json:"app_id,omitempty"`
 	Status    string     `json:"status"`
 	ExpiresAt time.Time  `json:"expires_at"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -285,6 +290,7 @@ func ToTenantInvitationResponse(inv *entity.TenantInvitation) *TenantInvitationR
 		TenantID:  inv.TenantID,
 		Email:     inv.Email,
 		RoleID:    inv.RoleID,
+		AppID:     inv.AppID,
 		Status:    string(inv.Status),
 		ExpiresAt: inv.ExpiresAt,
 		CreatedAt: inv.CreatedAt,
@@ -301,6 +307,7 @@ func ToTenantMemberResponse(member *entity.TenantMember) *TenantMemberResponse {
 		TenantID:  member.TenantID,
 		UserID:    member.UserID,
 		RoleID:    member.RoleID,
+		AppID:     member.AppID,
 		CreatedAt: member.CreatedAt,
 	}
 	if member.User != nil {

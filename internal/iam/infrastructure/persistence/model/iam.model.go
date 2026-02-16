@@ -80,6 +80,7 @@ type TenantMemberModel struct {
 	TenantID  uuid.UUID  `gorm:"column:tenant_id;type:uuid;not null"`
 	UserID    uuid.UUID  `gorm:"column:user_id;type:uuid;not null"`
 	RoleID    *uuid.UUID `gorm:"column:role_id;type:uuid"`
+	AppID     *uuid.UUID `gorm:"column:app_id;type:uuid"` // Nullable
 	CreatedAt time.Time  `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time  `gorm:"column:updated_at;autoUpdateTime"`
 

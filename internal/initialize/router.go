@@ -3,13 +3,18 @@ package initialize
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 
 	"CONVERDA/global"
+	"CONVERDA/internal/apps/controller"
 	initializeApps "CONVERDA/internal/initialize/apps"
 	initializeIAM "CONVERDA/internal/initialize/iam"
+	initializeMessaging "CONVERDA/internal/initialize/messaging"
+	initializeNotification "CONVERDA/internal/initialize/notification"
 	initializeR2 "CONVERDA/internal/initialize/r2"
 	"CONVERDA/internal/middleware"
 	r2Http "CONVERDA/internal/r2/controller/http"
+	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -20,6 +25,10 @@ import (
 func InitRouter(db *sql.DB) *gin.Engine {
 	r := gin.Default()
 	fmt.Printf("Server mode: %s\n", global.Config.Server.Mode)
+
+	// Health check
+	healthController := controller.NewHealthController()
+	r.GET("/health", response.Wrap(healthController.Check, http.StatusOK))
 
 	if global.Config.Server.Mode != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -42,7 +51,14 @@ func InitRouter(db *sql.DB) *gin.Engine {
 		initializeIAM.InitIAMModule(v1, middleware.AuthMiddleware())
 
 		// Apps module routes
+		// Apps module routes
 		initializeApps.InitAppsModule(v1, middleware.AuthMiddleware())
+
+		// Messaging module routes
+		initializeMessaging.InitMessagingModule(v1, middleware.AuthMiddleware())
+
+		// Notification module routes
+		initializeNotification.InitNotificationModule(global.GormDB, v1)
 	}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

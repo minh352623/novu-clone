@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"CONVERDA/global"
+	"CONVERDA/internal/infrastructure/persistence/plugin"
 
-	_ "github.com/lib/pq" // Postgresql driver
+	// Postgresql driver
+	_ "github.com/lib/pq"
 
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -33,6 +35,12 @@ func InitPostgresql() {
 	gormDB, err := gorm.Open(postgres.Open(s), &gorm.Config{})
 	if err != nil {
 		global.Logger.Error("Failed to initialize GORM", zap.Error(err))
+		panic(err)
+	}
+
+	// Register RLS Plugin
+	if err := gormDB.Use(plugin.NewRLSPlugin()); err != nil {
+		global.Logger.Error("Failed to register RLS plugin", zap.Error(err))
 		panic(err)
 	}
 

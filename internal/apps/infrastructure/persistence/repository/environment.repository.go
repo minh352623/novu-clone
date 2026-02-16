@@ -28,9 +28,23 @@ func (r *environmentRepository) Create(ctx context.Context, env *entity.Environm
 	return mapper.ToEnvironmentEntity(m), nil
 }
 
+func (r *environmentRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.Environment, error) {
+	var m model.EnvironmentModel
+	if err := r.db.WithContext(ctx).Preload("Keys").Where("id = ?", id).First(&m).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return mapper.ToEnvironmentEntity(&m), nil
+}
+
 func (r *environmentRepository) GetByAppAndCode(ctx context.Context, appID uuid.UUID, code string) (*entity.Environment, error) {
 	var m model.EnvironmentModel
-	if err := r.db.WithContext(ctx).Where("app_id = ? AND environment_code = ?", appID, code).First(&m).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Keys").Where("app_id = ? AND environment_code = ?", appID, code).First(&m).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return mapper.ToEnvironmentEntity(&m), nil
@@ -38,7 +52,7 @@ func (r *environmentRepository) GetByAppAndCode(ctx context.Context, appID uuid.
 
 func (r *environmentRepository) ListByApp(ctx context.Context, appID uuid.UUID) ([]*entity.Environment, error) {
 	var models []model.EnvironmentModel
-	if err := r.db.WithContext(ctx).Where("app_id = ?", appID).Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Keys").Where("app_id = ?", appID).Find(&models).Error; err != nil {
 		return nil, err
 	}
 	return mapper.ToEnvironmentEntities(models), nil

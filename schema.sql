@@ -44,6 +44,7 @@ CREATE TABLE pricing_plans (
     monthly_credits BIGINT NOT NULL DEFAULT 0,
     price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     currency TEXT DEFAULT 'USD',
+    features JSONB DEFAULT '{}', -- [NEW] Plan features
     description TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     is_default BOOLEAN DEFAULT FALSE,
@@ -160,6 +161,30 @@ CREATE TABLE webhooks (
 
 CREATE TRIGGER update_webhooks_modtime BEFORE UPDATE ON webhooks FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
+-- [NEW] Webhook Logs & Retention
+CREATE TABLE webhook_logs (
+    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    webhook_id UUID NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    request_payload JSONB,
+    response_code INTEGER,
+    response_body TEXT,
+    duration_ms INTEGER,
+    status TEXT NOT NULL, -- 'success', 'failed'
+    tenant_id UUID NOT NULL, -- Denormalized for RLS
+    app_id UUID NOT NULL,    -- Denormalized for RLS
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Retention Policy for Webhook Logs (90 days)
+CREATE OR REPLACE FUNCTION delete_old_webhook_logs()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM webhook_logs WHERE created_at < NOW() - INTERVAL '90 days';
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE TABLE providers (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE, -- Denormalized
@@ -168,10 +193,26 @@ CREATE TABLE providers (
     provider_type TEXT NOT NULL, -- 'email', 'sms', 'push', 'in-app'
     provider_name TEXT NOT NULL, -- 'sendgrid', 'fcm'
     is_active BOOLEAN DEFAULT TRUE,
-    configuration JSONB NOT NULL, -- Credentials specific to this env
+    -- configuration column moved to provider_configs
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- [NEW] Provider Configurations (Environment specific credentials)
+CREATE TABLE provider_configs (
+    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+    environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL, -- Denormalized for RLS
+    app_id UUID NOT NULL,    -- Denormalized for RLS
+    configuration JSONB NOT NULL, -- Credentials specific to this env
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (provider_id, environment_id)
+);
+
+CREATE TRIGGER update_provider_configs_modtime BEFORE UPDATE ON provider_configs FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
 -- -----------------------------------------------------------------------------
 -- 3. Workflow Engine Module
@@ -193,6 +234,7 @@ CREATE TABLE workflow_steps (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
     workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
     parent_step_id UUID REFERENCES workflow_steps(id),
+    provider_config_id UUID REFERENCES provider_configs(id) ON DELETE SET NULL, -- [NEW] Reference to env-specific config
     step_type TEXT NOT NULL,
     config JSONB DEFAULT '{}', -- template content, delay settings, etc
     "order" INTEGER NOT NULL DEFAULT 0,
@@ -215,124 +257,63 @@ CREATE TABLE subscribers (
 -- 4. Messaging Module (Nested Set Model)
 -- -----------------------------------------------------------------------------
 
-CREATE TABLE conversation_pools (
+CREATE TABLE threads (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
     environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
-    subscriber_id UUID REFERENCES subscribers(id),
+    type TEXT NOT NULL DEFAULT 'support', -- 'direct', 'group', 'support'
+    channel TEXT NOT NULL DEFAULT 'support', -- 'zalo', 'facebook', 'web', 'telegram'
     status TEXT NOT NULL DEFAULT 'unassigned', -- 'unassigned', 'assigned', 'resolved'
-    assigned_to_member_id UUID REFERENCES tenant_members(id),
+    metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE thread_participants (
+    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    entity_type TEXT NOT NULL, -- 'user', 'subscriber'
+    entity_id UUID NOT NULL,
+    last_read_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (thread_id, entity_type, entity_id)
+);
+
 CREATE TABLE assignment_logs (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
-    pool_id UUID NOT NULL REFERENCES conversation_pools(id) ON DELETE CASCADE,
+    thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
     assigned_to_member_id UUID REFERENCES tenant_members(id),
     assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     resolved_at TIMESTAMP WITH TIME ZONE,
     response_time_seconds INTEGER -- Calculated upon resolution
 );
 
--- PARTITIONED Messages Table
--- Implementing Nested Set Model columns: lft, rgt, depth, root_id (pool_id is the root container)
--- Note: 'messages' should NOT be partitioned if we rely on global foreign keys easily,
--- but for scale, we partition. Nested set queries within a partition are fine.
--- However, if a conversation spans months, partitioning by created_at makes tree queries hard.
--- REQUIREMENT CHECK: User asked for partitioning on messages.
--- COMPROMISE: We partition by created_at. Tree traversal works best within a single pool.
--- Queries usually fetch "WHERE pool_id = X ORDER BY lft".
--- If messages for a single pool are split across partitions, simple SELECTs work, but updates are tricky.
--- Given 'NaaS' context, conversations are likely short-lived (days).
+-- Using Closure Table Model for messaging hierarchy
 CREATE TABLE messages (
     id UUID NOT NULL DEFAULT generate_uuid_v7(),
     tenant_id UUID NOT NULL, -- De-normalized for RLS
-    environment_id UUID NOT NULL,
-    pool_id UUID NOT NULL, -- effectively the 'root_id' for grouping
+    environment_id uuid NOT NULL,
+    thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
     sender_type TEXT NOT NULL, -- 'agent', 'contact', 'system'
     sender_id UUID,
     content JSONB NOT NULL,
-    -- Nested Set Columns
-    parent_id UUID, -- Adjacency for easier insert logic
-    lft INTEGER NOT NULL,
-    rgt INTEGER NOT NULL,
-    depth INTEGER NOT NULL DEFAULT 0,
+    parent_id UUID, -- Adjacency link (Optional but helpful)
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id)
 );
 
--- Indexes for Tree Traversal
-CREATE INDEX idx_messages_pool_lft ON messages (pool_id, lft);
-CREATE INDEX idx_messages_pool_rgt ON messages (pool_id, rgt);
+CREATE INDEX idx_messages_thread_created ON messages (thread_id, created_at);
 CREATE INDEX idx_messages_parent ON messages (parent_id);
 
--- Stored Procedure to Insert Message (Nested Set Logic)
--- WARNING: This logic assumes non-partitioned access or access via 'messages' view.
--- Since it's partitioned, we must be careful.
--- For simplicity, this procedure acts on the parent table.
-CREATE OR REPLACE FUNCTION add_message_node(
-    p_tenant_id UUID,
-    p_env_id UUID,
-    p_pool_id UUID,
-    p_parent_id UUID,
-    p_sender_type TEXT,
-    p_sender_id UUID,
-    p_content JSONB
-) RETURNS UUID AS $$
-DECLARE
-    v_rgt INTEGER;
-    v_lft INTEGER;
-    v_depth INTEGER;
-    v_new_id UUID;
-BEGIN
-    -- If root node (first message in pool)
-    IF p_parent_id IS NULL THEN
-        -- Check if exists? Assuming new conversation means empty.
-        -- But if adding to existing pool without parent, it's a new root?
-        -- Usually conversation has one root. Let's assume appending to root if p_parent_id is null involves finding max rgt?
-        -- Simplified: p_parent_id IS NULL -> First message.
-        v_lft := 1;
-        v_rgt := 2;
-        v_depth := 0;
-    ELSE
-        -- Get parent info
-        -- LOCKING: We must lock the rows for this pool to prevent concurrent updates messing up lft/rgt
-        -- Note: Locking partitioned tables can be heavy. We select for update.
-        SELECT rgt, depth INTO v_rgt, v_depth
-        FROM messages
-        WHERE id = p_parent_id AND pool_id = p_pool_id
-        LIMIT 1;
-        -- FOR UPDATE; -- skipped for syntax simplicity in this prompt, but highly recommended in prod
+CREATE TABLE message_closure (
+    ancestor_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    descendant_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    depth INTEGER NOT NULL,
+    PRIMARY KEY (ancestor_id, descendant_id)
+);
 
-        IF NOT FOUND THEN
-             RAISE EXCEPTION 'Parent message not found';
-        END IF;
+CREATE INDEX idx_message_closure_descendant ON message_closure(descendant_id);
 
-        -- Update existing nodes to make space
-        -- Note: This is EXPENSIVE on large trees in SQL.
-        -- Optimization: In a real chat, we usually just append time-based,
-        -- but User requested Nested Set.
-        UPDATE messages SET rgt = rgt + 2 WHERE pool_id = p_pool_id AND rgt >= v_rgt;
-        UPDATE messages SET lft = lft + 2 WHERE pool_id = p_pool_id AND lft > v_rgt;
-
-        v_lft := v_rgt;
-        v_rgt := v_rgt + 1;
-        v_depth := v_depth + 1;
-    END IF;
-
-    v_new_id := generate_uuid_v7();
-
-    INSERT INTO messages (
-        id, tenant_id, environment_id, pool_id, sender_type, sender_id, content,
-        parent_id, lft, rgt, depth, created_at
-    ) VALUES (
-        v_new_id, p_tenant_id, p_env_id, p_pool_id, p_sender_type, p_sender_id, p_content,
-        p_parent_id, v_lft, v_rgt, v_depth, NOW()
-    );
-
-    RETURN v_new_id;
-END;
-$$ LANGUAGE plpgsql;
 
 -- -----------------------------------------------------------------------------
 -- 5. Billing Configuration Module
@@ -425,6 +406,8 @@ $$ LANGUAGE SQL STABLE;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE environments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE thread_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
 -- Tenants: Users can see their own tenant
@@ -435,8 +418,25 @@ CREATE POLICY tenant_isolation ON tenants
 CREATE POLICY app_isolation ON apps
     USING (tenant_id = current_app_tenant());
 
+-- Threads: Isolation by environment -> app -> tenant
+CREATE POLICY thread_isolation ON threads
+    USING (environment_id IN (SELECT e.id FROM environments e JOIN apps a ON e.app_id = a.id WHERE a.tenant_id = current_app_tenant()));
+
+-- Participants: Isolation by thread -> environment -> app -> tenant
+CREATE POLICY participant_isolation ON thread_participants
+    USING (thread_id IN (SELECT t.id FROM threads t WHERE t.environment_id IN (SELECT e.id FROM environments e JOIN apps a ON e.app_id = a.id WHERE a.tenant_id = current_app_tenant())));
+
 -- Messages: RLS filter by Tenant ID stored in the row
 CREATE POLICY message_isolation ON messages
+    USING (tenant_id = current_app_tenant());
+
+-- [NEW] RLS Policies for new tables
+ALTER TABLE provider_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY provider_config_isolation ON provider_configs
+    USING (tenant_id = current_app_tenant());
+
+ALTER TABLE webhook_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY webhook_log_isolation ON webhook_logs
     USING (tenant_id = current_app_tenant());
 
 
@@ -554,7 +554,8 @@ CREATE TABLE notification_jobs (
 CREATE TRIGGER update_notification_jobs_modtime BEFORE UPDATE ON notification_jobs FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
 -- Notification Logs (Individual Sends) - REMOVED PARTITIONING
-CREATE TABLE notification_logs (
+-- Renamed to 'notifications' to match Domain Entity
+CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
     job_id UUID, 
     environment_id UUID NOT NULL, 
@@ -580,7 +581,7 @@ CREATE TABLE notification_logs (
 -- Notification Tracking (Opens/Clicks)
 CREATE TABLE notification_trackings (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
-    log_id UUID NOT NULL, -- Logical reference to notification_logs(id)
+    notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE, -- Renamed from log_id
     tracking_token TEXT UNIQUE NOT NULL,
     
     opened_at TIMESTAMP WITH TIME ZONE,

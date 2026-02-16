@@ -33,6 +33,9 @@ type AuthService interface {
 
 	// ChangePassword changes a user's password
 	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error
+
+	// GetUser retrieves a user by ID
+	GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error)
 }
 
 // TenantService handles tenant operations
@@ -57,4 +60,14 @@ type TenantService interface {
 
 	// GetUserTenants gets all tenants a user belongs to
 	GetUserTenants(ctx context.Context, userID uuid.UUID) ([]*entity.Tenant, error)
+}
+
+// RoleService handles role operations
+type RoleService interface {
+	CreateRole(ctx context.Context, name, slug string, permissions map[string]interface{}) (*entity.Role, error)
+	GetRole(ctx context.Context, id uuid.UUID) (*entity.Role, error)
+	ListRoles(ctx context.Context, filters repository.RoleFilters) ([]*entity.Role, int64, error)
+	UpdateRole(ctx context.Context, role *entity.Role) error
+	DeleteRole(ctx context.Context, id uuid.UUID) error
+	UpdatePermissions(ctx context.Context, id uuid.UUID, permissions map[string]interface{}) error
 }
