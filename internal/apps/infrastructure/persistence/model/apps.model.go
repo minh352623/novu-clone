@@ -7,12 +7,13 @@ import (
 )
 
 type AppModel struct {
-	ID          uuid.UUID `gorm:"column:id;type:uuid;primaryKey"`
-	TenantID    uuid.UUID `gorm:"column:tenant_id;type:uuid;not null"`
-	Name        string    `gorm:"column:name;type:text;not null"`
-	Description *string   `gorm:"column:description;type:text"`
-	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	ID                  uuid.UUID `gorm:"column:id;type:uuid;primaryKey"`
+	TenantID            uuid.UUID `gorm:"column:tenant_id;type:uuid;not null"`
+	Name                string    `gorm:"column:name;type:text;not null"`
+	Description         *string   `gorm:"column:description;type:text"`
+	CreatedAt           time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt           time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	SLAThresholdSeconds int       `gorm:"column:sla_threshold_seconds;type:integer;default:0"`
 
 	// Relations
 	Environments []EnvironmentModel `gorm:"foreignKey:AppID"`
@@ -23,11 +24,14 @@ func (AppModel) TableName() string {
 }
 
 type EnvironmentModel struct {
-	ID              uuid.UUID `gorm:"column:id;type:uuid;primaryKey"`
-	AppID           uuid.UUID `gorm:"column:app_id;type:uuid;not null"`
-	EnvironmentCode string    `gorm:"column:environment_code;type:text;not null"`
-	CreatedAt       time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt       time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	ID                  uuid.UUID `gorm:"column:id;type:uuid;primaryKey"`
+	AppID               uuid.UUID `gorm:"column:app_id;type:uuid;not null"`
+	EnvironmentCode     string    `gorm:"column:environment_code;type:text;not null"`
+	CreatedAt           time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt           time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	SLAThresholdSeconds int       `gorm:"column:sla_threshold_seconds;type:integer;default:0"`
+	RateLimitRPM        int       `gorm:"column:rate_limit_rpm;type:integer;default:0"`
+	RateLimitDaily      int       `gorm:"column:rate_limit_daily;type:integer;default:0"`
 
 	// Relation
 	App  *AppModel     `gorm:"foreignKey:AppID"`

@@ -13,17 +13,20 @@ var (
 )
 
 type Webhook struct {
-	ID            uuid.UUID `json:"id"`
-	TenantID      uuid.UUID `json:"tenant_id"`
-	AppID         uuid.UUID `json:"app_id"`
-	EnvironmentID uuid.UUID `json:"environment_id"`
-	URL           string    `json:"url"`
-	Secret        string    `json:"secret"`
-	Description   *string   `json:"description,omitempty"`
-	Events        []string  `json:"events"`
-	IsActive      bool      `json:"is_active"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID                  uuid.UUID `json:"id"`
+	TenantID            uuid.UUID `json:"tenant_id"`
+	AppID               uuid.UUID `json:"app_id"`
+	EnvironmentID       uuid.UUID `json:"environment_id"`
+	URL                 string    `json:"url"`
+	Secret              string    `json:"secret"`
+	Description         *string   `json:"description,omitempty"`
+	Events              []string  `json:"events"`
+	IsActive            bool      `json:"is_active"`
+	MaxRetries          int       `json:"max_retries"`
+	RetryBackoffSeconds int       `json:"retry_backoff_seconds"`
+	RetryTimeoutSeconds int       `json:"retry_timeout_seconds"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 func NewWebhook(tenantID, appID, environmentID uuid.UUID, url string, events []string, description *string) (*Webhook, error) {

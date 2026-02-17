@@ -37,3 +37,39 @@ func ToTemplateDomain(t *model.NotificationTemplateModel, c *model.NotificationT
 		UpdatedAt: t.UpdatedAt,
 	}
 }
+
+// ToTemplateContentDomain maps a content model to the domain entity.
+func ToTemplateContentDomain(c *model.NotificationTemplateContentModel) *entity.TemplateContent {
+	if c == nil {
+		return nil
+	}
+	return &entity.TemplateContent{
+		ID:           c.ID,
+		TemplateID:   c.TemplateID,
+		Version:      c.Version,
+		LanguageCode: c.LanguageCode,
+		Subject:      c.Subject,
+		BodyText:     c.BodyText,
+		BodyHTML:     c.BodyHtml,
+		BodyPush:     c.BodyPush,
+		CreatedAt:    c.CreatedAt,
+	}
+}
+
+// ToTemplateContentModel maps a domain entity to the GORM model.
+func ToTemplateContentModel(e *entity.TemplateContent) *model.NotificationTemplateContentModel {
+	if e == nil {
+		return nil
+	}
+	return &model.NotificationTemplateContentModel{
+		ID:           e.ID,
+		TemplateID:   e.TemplateID,
+		Version:      e.Version,
+		LanguageCode: e.LanguageCode,
+		Subject:      e.Subject,
+		BodyText:     e.BodyText,
+		BodyHtml:     e.BodyHTML,
+		BodyPush:     e.BodyPush,
+		CreatedAt:    e.CreatedAt,
+	}
+}

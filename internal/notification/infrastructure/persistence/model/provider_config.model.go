@@ -13,6 +13,7 @@ type ProviderConfigModel struct {
 	ProviderID    uuid.UUID       `gorm:"type:uuid;not null"`
 	EnvironmentID uuid.UUID       `gorm:"type:uuid;not null"`
 	TenantID      uuid.UUID       `gorm:"type:uuid;not null"`
+	AppID         uuid.UUID       `gorm:"type:uuid;not null"`
 	Configuration json.RawMessage `gorm:"type:jsonb;not null"`
 	IsActive      bool            `gorm:"default:true"`
 	CreatedAt     time.Time

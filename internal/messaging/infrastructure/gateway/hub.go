@@ -16,6 +16,9 @@ type Hub struct {
 	// Map of userId to clients (one user can have multiple connections/tabs)
 	userClients map[uuid.UUID]map[*Client]bool
 
+	// Map of environmentId to clients
+	envClients map[uuid.UUID]map[*Client]bool
+
 	// Inbound messages from the clients.
 	broadcast chan []byte
 
@@ -36,6 +39,7 @@ func NewHub() *Hub {
 		unregister:  make(chan *Client),
 		clients:     make(map[*Client]bool),
 		userClients: make(map[uuid.UUID]map[*Client]bool),
+		envClients:  make(map[uuid.UUID]map[*Client]bool),
 	}
 }
 
@@ -49,6 +53,11 @@ func (h *Hub) Run() {
 				h.userClients[client.UserID] = make(map[*Client]bool)
 			}
 			h.userClients[client.UserID][client] = true
+
+			if _, ok := h.envClients[client.EnvironmentID]; !ok {
+				h.envClients[client.EnvironmentID] = make(map[*Client]bool)
+			}
+			h.envClients[client.EnvironmentID][client] = true
 			h.mu.Unlock()
 
 		case client := <-h.unregister:
@@ -62,6 +71,14 @@ func (h *Hub) Run() {
 					delete(userConns, client)
 					if len(userConns) == 0 {
 						delete(h.userClients, client.UserID)
+					}
+				}
+
+				// Remove from envClients
+				if envConns, ok := h.envClients[client.EnvironmentID]; ok {
+					delete(envConns, client)
+					if len(envConns) == 0 {
+						delete(h.envClients, client.EnvironmentID)
 					}
 				}
 			}
@@ -97,6 +114,22 @@ func (h *Hub) BroadcastToUsers(message []byte, userIDs []uuid.UUID) {
 					// If channel is full, we might want to log or disconnect
 					log.Printf("Failed to send to client %s, buffer full", client.UserID)
 				}
+			}
+		}
+	}
+}
+
+// BroadcastToEnvironment sends a message to all clients in a specific environment
+func (h *Hub) BroadcastToEnvironment(envID uuid.UUID, message []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if clients, ok := h.envClients[envID]; ok {
+		for client := range clients {
+			select {
+			case client.send <- message:
+			default:
+				log.Printf("Failed to send to client %s in env %s, buffer full", client.UserID, envID)
 			}
 		}
 	}

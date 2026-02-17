@@ -58,5 +58,6 @@ func RegisterMessagingRoutes(
 		dashboardGroup.GET("/team", response.Wrap(conversationController.GetTeamDashboard, http.StatusOK))
 		dashboardGroup.GET("/partner", response.Wrap(conversationController.GetPartnerDashboard, http.StatusOK))
 		dashboardGroup.GET("/agent/:member_id", response.Wrap(conversationController.GetAgentDashboard, http.StatusOK))
+		dashboardGroup.GET("/personal", response.Wrap(conversationController.GetPersonalDashboard, http.StatusOK))
 	}
 }

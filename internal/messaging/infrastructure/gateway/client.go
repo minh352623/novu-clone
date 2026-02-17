@@ -45,6 +45,9 @@ type Client struct {
 
 	// User identifier
 	UserID uuid.UUID
+
+	// Environment identifier
+	EnvironmentID uuid.UUID
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -113,13 +116,13 @@ func (c *Client) writePump() {
 }
 
 // ServeWs handles websocket requests from the peer.
-func ServeWs(hub *Hub, c *gin.Context, userID uuid.UUID) {
+func ServeWs(hub *Hub, c *gin.Context, userID uuid.UUID, envID uuid.UUID) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{Hub: hub, conn: conn, send: make(chan []byte, 256), UserID: userID}
+	client := &Client{Hub: hub, conn: conn, send: make(chan []byte, 256), UserID: userID, EnvironmentID: envID}
 	client.Hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in

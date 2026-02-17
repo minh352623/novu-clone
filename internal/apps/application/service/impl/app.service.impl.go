@@ -33,10 +33,10 @@ func NewAppService(
 	}
 }
 
-func (s *appServiceImpl) CreateApp(ctx context.Context, tenantID uuid.UUID, name string, description *string) (*entity.App, error) {
+func (s *appServiceImpl) CreateApp(ctx context.Context, tenantID uuid.UUID, name string, description *string, slaThreshold *int) (*entity.App, error) {
 	app, err := entity.NewApp(tenantID, name, description)
-	if err != nil {
-		return nil, err
+	if slaThreshold != nil {
+		app.SLAThresholdSeconds = *slaThreshold
 	}
 
 	createdApp, err := s.appRepo.Create(ctx, app)

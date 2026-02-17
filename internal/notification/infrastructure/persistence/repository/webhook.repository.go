@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
@@ -54,4 +55,22 @@ func (r *webhookLogRepository) Create(ctx context.Context, log *entity.WebhookLo
 func (r *webhookLogRepository) Update(ctx context.Context, log *entity.WebhookLog) error {
 	m := mapper.ToWebhookLogModel(log)
 	return r.db.WithContext(ctx).Save(m).Error
+}
+
+func (r *webhookLogRepository) GetPendingRetries(ctx context.Context, limit int) ([]*entity.WebhookLog, error) {
+	var models []*model.WebhookLogModel
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND retry_count < max_retries AND next_retry_at <= ?", entity.WebhookLogStatusFailed, time.Now()).
+		Order("next_retry_at ASC").
+		Limit(limit).
+		Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var logs []*entity.WebhookLog
+	for _, m := range models {
+		logs = append(logs, mapper.ToWebhookLogDomain(m))
+	}
+	return logs, nil
 }

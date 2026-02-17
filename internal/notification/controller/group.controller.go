@@ -74,13 +74,7 @@ func (c *GroupController) ListGroups(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
 	}
 
-	// Assuming dto.PaginatedResponse exists or generic map
-	return map[string]interface{}{
-		"data":  dto.ToGroupResponseList(groups),
-		"page":  page,
-		"limit": limit,
-		"total": total,
-	}, nil
+	return dto.NewPaginatedResponse(dto.ToGroupResponseList(groups), page, limit, total), nil
 }
 
 // GetGroup godoc

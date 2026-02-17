@@ -40,10 +40,13 @@ func RegisterAppsRoutes(
 		apps.PUT("/:app_id", response.Wrap(appController.UpdateApp, http.StatusOK))
 		apps.DELETE("/:app_id", response.Wrap(appController.DeleteApp, http.StatusOK))
 		apps.GET("/:app_id/metrics", response.Wrap(appController.GetAppMetrics, http.StatusOK))
+		apps.GET("/:app_id/metrics/detailed", response.Wrap(appController.GetDetailedMetrics, http.StatusOK))
+		apps.GET("/:app_id/metrics/timeseries", response.Wrap(appController.GetDailyTimeSeries, http.StatusOK))
 
 		// Environments
 		apps.POST("/:app_id/environments", response.Wrap(appController.CreateEnvironment, http.StatusCreated))
 		apps.GET("/:app_id/environments", response.Wrap(appController.ListEnvironments, http.StatusOK))
+		apps.PUT("/:app_id/environments/:env_id", response.Wrap(appController.UpdateEnvironmentConfig, http.StatusOK))
 
 		// Webhooks
 		apps.POST("/:app_id/webhooks", response.Wrap(webhookController.CreateWebhook, http.StatusCreated))

@@ -26,6 +26,7 @@ func (r *usageMetricRepository) Create(ctx context.Context, metric *entity.Usage
 		AppID:         metric.AppID,
 		EnvironmentID: metric.EnvironmentID,
 		ProviderType:  metric.ProviderType,
+		Direction:     metric.Direction,
 		StatusCode:    metric.StatusCode,
 		Timestamp:     metric.Timestamp,
 	}
@@ -61,4 +62,159 @@ func (r *usageMetricRepository) GetEnvironmentUsage(ctx context.Context, envID u
 		Where("environment_id = ? AND timestamp BETWEEN ? AND ?", envID, from, to).
 		Count(&count).Error
 	return count, err
+}
+
+// --- US-RA-02.5: Detailed metrics ---
+
+func (r *usageMetricRepository) GetDetailedSummary(ctx context.Context, appID uuid.UUID, from, to time.Time) (*entity.DetailedMetricsSummary, error) {
+	// 1. Overall counts
+	var overallResult struct {
+		Total    int64
+		Inbound  int64
+		Outbound int64
+		Success  int64
+		Failed   int64
+	}
+
+	err := r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
+		Select(`
+			COUNT(*) as total,
+			SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound,
+			SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound,
+			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
+		`).
+		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to).
+		Scan(&overallResult).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Per-provider breakdown
+	var providerResults []struct {
+		ProviderType string
+		Total        int64
+		Success      int64
+		Failed       int64
+	}
+
+	err = r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
+		Select(`
+			provider_type,
+			COUNT(*) as total,
+			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
+		`).
+		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to).
+		Group("provider_type").
+		Scan(&providerResults).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	byProvider := make(map[string]entity.ProviderMetric)
+	for _, p := range providerResults {
+		byProvider[p.ProviderType] = entity.ProviderMetric{
+			Total:   p.Total,
+			Success: p.Success,
+			Failed:  p.Failed,
+		}
+	}
+
+	return &entity.DetailedMetricsSummary{
+		TotalMessages:    overallResult.Total,
+		InboundMessages:  overallResult.Inbound,
+		OutboundMessages: overallResult.Outbound,
+		SuccessCount:     overallResult.Success,
+		FailureCount:     overallResult.Failed,
+		ByProvider:       byProvider,
+	}, nil
+}
+
+func (r *usageMetricRepository) GetDailyTimeSeries(ctx context.Context, appID uuid.UUID, envID *uuid.UUID, from, to time.Time) ([]entity.DailyMetric, error) {
+	var results []struct {
+		Date     string
+		Inbound  int64
+		Outbound int64
+		Success  int64
+		Failed   int64
+	}
+
+	query := r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
+		Select(`
+			TO_CHAR(timestamp, 'YYYY-MM-DD') as date,
+			SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound,
+			SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound,
+			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
+		`).
+		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to)
+
+	if envID != nil {
+		query = query.Where("environment_id = ?", *envID)
+	}
+
+	err := query.
+		Group("TO_CHAR(timestamp, 'YYYY-MM-DD')").
+		Order("date ASC").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	dailyMetrics := make([]entity.DailyMetric, 0, len(results))
+	for _, r := range results {
+		dailyMetrics = append(dailyMetrics, entity.DailyMetric{
+			Date:     r.Date,
+			Inbound:  r.Inbound,
+			Outbound: r.Outbound,
+			Success:  r.Success,
+			Failed:   r.Failed,
+		})
+	}
+	return dailyMetrics, nil
+}
+
+func (r *usageMetricRepository) GetEnvironmentBreakdown(ctx context.Context, appID uuid.UUID, from, to time.Time) ([]entity.EnvironmentMetric, error) {
+	var results []struct {
+		EnvironmentID uuid.UUID
+		Total         int64
+		Inbound       int64
+		Outbound      int64
+		Success       int64
+		Failed        int64
+	}
+
+	err := r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
+		Select(`
+			environment_id,
+			COUNT(*) as total,
+			SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound,
+			SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound,
+			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
+		`).
+		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to).
+		Group("environment_id").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	envMetrics := make([]entity.EnvironmentMetric, 0, len(results))
+	for _, r := range results {
+		envMetrics = append(envMetrics, entity.EnvironmentMetric{
+			EnvironmentID: r.EnvironmentID,
+			Total:         r.Total,
+			Inbound:       r.Inbound,
+			Outbound:      r.Outbound,
+			Success:       r.Success,
+			Failed:        r.Failed,
+		})
+	}
+	return envMetrics, nil
 }

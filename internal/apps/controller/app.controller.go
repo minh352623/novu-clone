@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 
 	"CONVERDA/internal/apps/application/service"
 	"CONVERDA/internal/apps/controller/dto"
@@ -56,7 +57,7 @@ func (c *AppController) CreateApp(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
 	}
 
-	app, err := c.appService.CreateApp(ctx.Request.Context(), tenantID, req.Name, req.Description)
+	app, err := c.appService.CreateApp(ctx.Request.Context(), tenantID, req.Name, req.Description, req.SLAThresholdSeconds)
 	if err != nil {
 		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
 	}
@@ -146,6 +147,9 @@ func (c *AppController) UpdateApp(ctx *gin.Context) (interface{}, error) {
 	if req.Description != nil {
 		app.Description = req.Description
 	}
+	if req.SLAThresholdSeconds != nil {
+		app.SLAThresholdSeconds = *req.SLAThresholdSeconds
+	}
 
 	if err := c.appService.UpdateApp(ctx.Request.Context(), app); err != nil {
 		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
@@ -200,7 +204,7 @@ func (c *AppController) CreateEnvironment(ctx *gin.Context) (interface{}, error)
 		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
 	}
 
-	env, err := c.envService.CreateEnvironment(ctx.Request.Context(), appID, req.Code)
+	env, err := c.envService.CreateEnvironment(ctx.Request.Context(), appID, req.Code, req.SLAThresholdSeconds)
 	if err != nil {
 		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
 	}
@@ -230,6 +234,58 @@ func (c *AppController) ListEnvironments(ctx *gin.Context) (interface{}, error) 
 	}
 
 	return dto.ToEnvironmentResponseList(envs), nil
+}
+
+// UpdateEnvironmentConfig godoc
+// @Summary Update environment configuration
+// @Description Update rate limit and SLA settings for an environment
+// @Tags Apps
+// @Accept json
+// @Produce json
+// @Param app_id path string true "App ID"
+// @Param env_id path string true "Environment ID"
+// @Param body body dto.UpdateEnvironmentConfigRequest true "Config update"
+// @Success 200 {object} dto.EnvironmentResponse
+// @Failure 400 {object} map[string]string
+// @Security BearerAuth
+// @Router /apps/{app_id}/environments/{env_id} [put]
+func (c *AppController) UpdateEnvironmentConfig(ctx *gin.Context) (interface{}, error) {
+	_, err := uuid.Parse(ctx.Param("app_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid app ID", err)
+	}
+
+	envID, err := uuid.Parse(ctx.Param("env_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid environment ID", err)
+	}
+
+	var req dto.UpdateEnvironmentConfigRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+	}
+
+	env, err := c.envService.GetByID(ctx.Request.Context(), envID)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusNotFound, "Environment not found", err)
+	}
+
+	// Apply partial updates
+	if req.SLAThresholdSeconds != nil {
+		env.SLAThresholdSeconds = *req.SLAThresholdSeconds
+	}
+	if req.RateLimitRPM != nil {
+		env.RateLimitRPM = *req.RateLimitRPM
+	}
+	if req.RateLimitDaily != nil {
+		env.RateLimitDaily = *req.RateLimitDaily
+	}
+
+	if err := c.envService.UpdateEnvironment(ctx.Request.Context(), env); err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return dto.ToEnvironmentResponse(env), nil
 }
 
 // ListAPIKeys godoc
@@ -333,6 +389,74 @@ func (c *AppController) GetAppMetrics(ctx *gin.Context) (interface{}, error) {
 	}
 
 	return metrics, nil
+}
+
+// GetDetailedMetrics godoc
+// @Summary Get detailed usage metrics for an app
+// @Tags Apps
+// @Produce json
+// @Param app_id path string true "App ID"
+// @Param days query int false "Days to look back (default: 30)"
+// @Success 200 {object} dto.DetailedMetricsResponse
+// @Router /apps/{app_id}/metrics/detailed [get]
+// @Security BearerAuth
+func (c *AppController) GetDetailedMetrics(ctx *gin.Context) (interface{}, error) {
+	appID, err := uuid.Parse(ctx.Param("app_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid app ID", err)
+	}
+
+	days := 30
+	if d := ctx.Query("days"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 {
+			days = v
+		}
+	}
+
+	result, err := c.metricsService.GetDetailedMetrics(ctx.Request.Context(), appID, days)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+	return result, nil
+}
+
+// GetDailyTimeSeries godoc
+// @Summary Get daily time-series metrics for an app
+// @Tags Apps
+// @Produce json
+// @Param app_id path string true "App ID"
+// @Param days query int false "Days to look back (default: 30)"
+// @Param environment_id query string false "Optional environment filter"
+// @Success 200 {object} dto.TimeSeriesResponse
+// @Router /apps/{app_id}/metrics/timeseries [get]
+// @Security BearerAuth
+func (c *AppController) GetDailyTimeSeries(ctx *gin.Context) (interface{}, error) {
+	appID, err := uuid.Parse(ctx.Param("app_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid app ID", err)
+	}
+
+	days := 30
+	if d := ctx.Query("days"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 {
+			days = v
+		}
+	}
+
+	var envID *uuid.UUID
+	if envStr := ctx.Query("environment_id"); envStr != "" {
+		parsed, err := uuid.Parse(envStr)
+		if err != nil {
+			return nil, response.NewAPIError(http.StatusBadRequest, "Invalid environment ID", err)
+		}
+		envID = &parsed
+	}
+
+	result, err := c.metricsService.GetDailyTimeSeries(ctx.Request.Context(), appID, envID, days)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+	return result, nil
 }
 
 // ListSystemEnvironments godoc

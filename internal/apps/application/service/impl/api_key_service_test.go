@@ -96,6 +96,11 @@ func (m *MockEnvironmentRepository) GetByAPIKey(ctx context.Context, apiKey stri
 	return args.Get(0).(*entity.Environment), args.Error(1)
 }
 
+func (m *MockEnvironmentRepository) Update(ctx context.Context, env *entity.Environment) error {
+	args := m.Called(ctx, env)
+	return args.Error(0)
+}
+
 func (m *MockEnvironmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)

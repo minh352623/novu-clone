@@ -87,6 +87,7 @@ func (r *threadRepository) Create(ctx context.Context, thread *entity.Thread) (*
 		ID:            thread.ID,
 		EnvironmentID: thread.EnvironmentID,
 		Type:          thread.Type,
+		Channel:       thread.Channel,
 		Status:        thread.Status,
 		Metadata:      datatypes.JSON(thread.Metadata),
 		ReferenceHash: thread.ReferenceHash,
@@ -108,9 +109,11 @@ func (r *threadRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.T
 		ID:            m.ID,
 		EnvironmentID: m.EnvironmentID,
 		Type:          m.Type,
+		Channel:       m.Channel,
 		Status:        m.Status,
 		Metadata:      json.RawMessage(m.Metadata),
 		ReferenceHash: m.ReferenceHash,
+		IsOverdue:     m.IsOverdue,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 	}, nil
@@ -125,9 +128,11 @@ func (r *threadRepository) GetByIDAndEnv(ctx context.Context, id, envID uuid.UUI
 		ID:            m.ID,
 		EnvironmentID: m.EnvironmentID,
 		Type:          m.Type,
+		Channel:       m.Channel,
 		Status:        m.Status,
 		Metadata:      json.RawMessage(m.Metadata),
 		ReferenceHash: m.ReferenceHash,
+		IsOverdue:     m.IsOverdue,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 	}, nil
@@ -138,8 +143,10 @@ func (r *threadRepository) Update(ctx context.Context, thread *entity.Thread) er
 		ID:            thread.ID,
 		EnvironmentID: thread.EnvironmentID,
 		Type:          thread.Type,
+		Channel:       thread.Channel,
 		Status:        thread.Status,
 		Metadata:      datatypes.JSON(thread.Metadata),
+		IsOverdue:     thread.IsOverdue,
 		UpdatedAt:     time.Now(),
 	}
 	return r.db.WithContext(ctx).Model(m).Updates(m).Error
@@ -156,6 +163,9 @@ func (r *threadRepository) List(ctx context.Context, filter domainRepo.ThreadFil
 	}
 	if filter.Type != nil {
 		db = db.Where("type = ?", *filter.Type)
+	}
+	if filter.IsOverdue != nil {
+		db = db.Where("is_overdue = ?", *filter.IsOverdue)
 	}
 
 	if filter.AssignedToMe && filter.MemberID != nil {
@@ -176,8 +186,10 @@ func (r *threadRepository) List(ctx context.Context, filter domainRepo.ThreadFil
 			ID:            m.ID,
 			EnvironmentID: m.EnvironmentID,
 			Type:          m.Type,
+			Channel:       m.Channel,
 			Status:        m.Status,
 			Metadata:      json.RawMessage(m.Metadata),
+			IsOverdue:     m.IsOverdue,
 			CreatedAt:     m.CreatedAt,
 			UpdatedAt:     m.UpdatedAt,
 		})
@@ -237,11 +249,11 @@ func (r *threadRepository) GetParticipants(ctx context.Context, threadID uuid.UU
 func (r *threadRepository) GetDirectThreadBetweenEntities(ctx context.Context, typeA string, idA uuid.UUID, typeB string, idB uuid.UUID) (*entity.Thread, error) {
 	var m model.ThreadModel
 	err := r.db.WithContext(ctx).
-		Table("conversation_pools").
-		Select("conversation_pools.*").
-		Joins("JOIN thread_participants p1 ON conversation_pools.id = p1.thread_id").
-		Joins("JOIN thread_participants p2 ON conversation_pools.id = p2.thread_id").
-		Where("conversation_pools.type = ?", entity.ThreadTypeDirect).
+		Table("threads").
+		Select("threads.*").
+		Joins("JOIN thread_participants p1 ON threads.id = p1.thread_id").
+		Joins("JOIN thread_participants p2 ON threads.id = p2.thread_id").
+		Where("threads.type = ?", entity.ThreadTypeDirect).
 		Where("p1.entity_type = ? AND p1.entity_id = ?", typeA, idA).
 		Where("p2.entity_type = ? AND p2.entity_id = ?", typeB, idB).
 		Limit(1).
@@ -255,9 +267,15 @@ func (r *threadRepository) GetDirectThreadBetweenEntities(ctx context.Context, t
 		ID:            m.ID,
 		EnvironmentID: m.EnvironmentID,
 		Type:          m.Type,
+		Channel:       m.Channel,
 		Status:        m.Status,
 		Metadata:      json.RawMessage(m.Metadata),
+		IsOverdue:     m.IsOverdue,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 	}, nil
+}
+
+func (r *threadRepository) MarkAsOverdue(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&model.ThreadModel{}).Where("id = ?", id).Update("is_overdue", true).Error
 }

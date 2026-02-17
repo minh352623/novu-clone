@@ -33,6 +33,11 @@ type BulkAssignRequest struct {
 	MemberID  *uuid.UUID  `json:"member_id"` // Optional
 }
 
+type WsEvent struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
 type ParticipantDTO struct {
 	ID   uuid.UUID `json:"id" binding:"required"`
 	Type string    `json:"type" binding:"required,oneof=user subscriber"`
@@ -95,6 +100,21 @@ type AgentStatsResponse struct {
 	TotalResolved      int       `json:"total_resolved"`
 	AvgResponseTime    float64   `json:"avg_response_time"`
 	CurrentOpenThreads int       `json:"current_open_threads"`
+}
+
+type AssignmentLogResponse struct {
+	ID                    uuid.UUID  `json:"id"`
+	ThreadID              uuid.UUID  `json:"thread_id"`
+	AssignedToMemberID    *uuid.UUID `json:"assigned_to_member_id"`
+	AssignedToDisplayName string     `json:"assigned_to_display_name,omitempty"`
+	AssignedAt            time.Time  `json:"assigned_at"`
+	ResolvedAt            *time.Time `json:"resolved_at,omitempty"`
+	ResponseTimeSeconds   *int       `json:"response_time_seconds,omitempty"`
+}
+
+type AuditTrailResponse struct {
+	ThreadID uuid.UUID                `json:"thread_id"`
+	Logs     []*AssignmentLogResponse `json:"logs"`
 }
 
 func ToMessageResponse(m *entity.Message) *MessageResponse {

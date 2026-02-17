@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"time"
 
+	"CONVERDA/global"
+	appsRepo "CONVERDA/internal/apps/domain/repository"
+	iamRepo "CONVERDA/internal/iam/domain/repository"
 	"CONVERDA/internal/messaging/application/service"
 	"CONVERDA/internal/messaging/controller/dto"
 	"CONVERDA/internal/messaging/domain/model/entity"
 	domainRepo "CONVERDA/internal/messaging/domain/repository"
+	"CONVERDA/internal/messaging/infrastructure/gateway"
 	"CONVERDA/pkg/cursor"
 
 	"github.com/google/uuid"
@@ -21,6 +25,10 @@ type conversationServiceImpl struct {
 	threadRepo domainRepo.ThreadRepository
 	subRepo    domainRepo.SubscriberRepository
 	logRepo    domainRepo.AssignmentLogRepository
+	memberRepo iamRepo.TenantMemberRepository
+	appRepo    appsRepo.AppRepository
+	envRepo    appsRepo.EnvironmentRepository
+	hub        *gateway.Hub
 }
 
 func NewConversationService(
@@ -28,12 +36,20 @@ func NewConversationService(
 	threadRepo domainRepo.ThreadRepository,
 	subRepo domainRepo.SubscriberRepository,
 	logRepo domainRepo.AssignmentLogRepository,
+	memberRepo iamRepo.TenantMemberRepository,
+	appRepo appsRepo.AppRepository,
+	envRepo appsRepo.EnvironmentRepository,
+	hub *gateway.Hub,
 ) service.ConversationService {
 	return &conversationServiceImpl{
 		msgRepo:    msgRepo,
 		threadRepo: threadRepo,
 		subRepo:    subRepo,
 		logRepo:    logRepo,
+		memberRepo: memberRepo,
+		appRepo:    appRepo,
+		envRepo:    envRepo,
+		hub:        hub,
 	}
 }
 
@@ -48,27 +64,24 @@ func (s *conversationServiceImpl) ReceiveMessage(ctx context.Context, tenantID, 
 		}
 	}
 
-	// 2. Find Open Support Thread for this subscriber
+	// 2. Find Latest Support Thread for this subscriber
 	supportType := "support"
 	threads, _, err := s.threadRepo.List(ctx, domainRepo.ThreadFilter{
 		EnvironmentID: &envID,
 		Type:          &supportType,
-		MemberID:      &sub.ID, // Using MemberID field in filter to filter by participant
-		Status:        nil,     // Any status except maybe resolved? Let's say we find any open one first.
+		MemberID:      &sub.ID,
+		Limit:         1,
 	})
 
 	var thread *entity.Thread
-	for _, t := range threads {
-		if t.Status != "resolved" {
-			thread = t
-			break
-		}
+	if len(threads) > 0 {
+		thread = threads[0]
 	}
 
 	if thread == nil {
 		// Create new support thread
 		if channel == "" {
-			channel = "support" // Default channel if not provided
+			channel = "support"
 		}
 		thread = entity.NewThread(envID, "support", channel)
 		thread, err = s.threadRepo.Create(ctx, thread)
@@ -81,6 +94,13 @@ func (s *conversationServiceImpl) ReceiveMessage(ctx context.Context, tenantID, 
 			return nil, err
 		}
 		thread.Participants = append(thread.Participants, part)
+	} else if thread.Status == "resolved" {
+		// Reopen resolved thread
+		thread.Status = "unassigned"
+		thread.IsOverdue = false
+		if err := s.threadRepo.Update(ctx, thread); err != nil {
+			return nil, err
+		}
 	}
 
 	// 3. Add Message
@@ -90,7 +110,11 @@ func (s *conversationServiceImpl) ReceiveMessage(ctx context.Context, tenantID, 
 	}
 
 	msg := entity.NewMessage(tenantID, envID, thread.ID, "contact", &realSenderID, content)
-	return s.msgRepo.Create(ctx, msg)
+	msg, err = s.msgRepo.Create(ctx, msg)
+	if err == nil {
+		s.broadcastEvent(envID, "message_received", msg)
+	}
+	return msg, err
 }
 
 func (s *conversationServiceImpl) ReplyMessage(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID, agentID uuid.UUID, content []byte) (*entity.Message, error) {
@@ -131,7 +155,11 @@ func (s *conversationServiceImpl) ReplyMessage(ctx context.Context, tenantID, en
 	msg := entity.NewMessage(tenantID, thread.EnvironmentID, thread.ID, "agent", &agentID, content)
 	msg.ParentID = parentID
 
-	return s.msgRepo.Create(ctx, msg)
+	msg, err = s.msgRepo.Create(ctx, msg)
+	if err == nil {
+		s.broadcastEvent(envID, "message_replied", msg)
+	}
+	return msg, err
 }
 
 func (s *conversationServiceImpl) AddInternalNote(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID, authorID uuid.UUID, content []byte) (*entity.Message, error) {
@@ -191,7 +219,16 @@ func (s *conversationServiceImpl) AssignThread(ctx context.Context, tenantID, en
 
 	// Create Assignment Log
 	log := entity.NewAssignmentLog(threadID, &memberID)
-	return s.logRepo.Create(ctx, log)
+	if err := s.logRepo.Create(ctx, log); err != nil {
+		return err
+	}
+
+	s.broadcastEvent(envID, "thread_assigned", map[string]interface{}{
+		"threadID":   threadID,
+		"assignedTo": memberID,
+	})
+
+	return nil
 }
 
 func (s *conversationServiceImpl) UnassignThread(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID) error {
@@ -242,9 +279,14 @@ func (s *conversationServiceImpl) ResolveThread(ctx context.Context, tenantID, e
 	}
 
 	thread.Status = "resolved"
+	thread.IsOverdue = false
 	if err := s.threadRepo.Update(ctx, thread); err != nil {
 		return err
 	}
+
+	s.broadcastEvent(envID, "thread_resolved", map[string]interface{}{
+		"threadID": threadID,
+	})
 
 	// Resolution Analytics
 	log, err := s.logRepo.GetLastByThread(ctx, threadID)
@@ -452,7 +494,16 @@ func (s *conversationServiceImpl) UpdateGroupThread(ctx context.Context, envID, 
 	metaBytes, _ := json.Marshal(meta)
 	thread.Metadata = metaBytes
 
-	return s.threadRepo.Update(ctx, thread)
+	if err := s.threadRepo.Update(ctx, thread); err != nil {
+		return err
+	}
+
+	s.broadcastEvent(envID, "thread_updated", map[string]interface{}{
+		"threadID": threadID,
+		"name":     name,
+	})
+
+	return nil
 }
 
 func (s *conversationServiceImpl) AddGroupParticipants(ctx context.Context, envID, threadID uuid.UUID, inputParticipants []*entity.ThreadParticipant) error {
@@ -550,7 +601,10 @@ func (s *conversationServiceImpl) ListThreads(ctx context.Context, tenantID, env
 
 func (s *conversationServiceImpl) GetTeamDashboard(ctx context.Context, req dto.DashboardStatsRequest) (*dto.TeamDashboardResponse, error) {
 	from, to := s.getPeriod(req.From, req.To)
-	sla := s.getSLA(req.SLAThreshold)
+	sla := req.SLAThreshold
+	if sla <= 0 {
+		sla = s.getSLAThreshold(ctx, req.EnvironmentID)
+	}
 
 	stats, err := s.logRepo.GetTeamStats(ctx, req.EnvironmentID, from, to, sla)
 	if err != nil {
@@ -563,7 +617,10 @@ func (s *conversationServiceImpl) GetTeamDashboard(ctx context.Context, req dto.
 func (s *conversationServiceImpl) GetPartnerDashboard(ctx context.Context, req dto.DashboardStatsRequest) (*dto.PartnerDashboardResponse, error) {
 	// For now, Partner Dashboard structure is similar to Team
 	from, to := s.getPeriod(req.From, req.To)
-	sla := s.getSLA(req.SLAThreshold)
+	sla := req.SLAThreshold
+	if sla <= 0 {
+		sla = s.getSLAThreshold(ctx, req.EnvironmentID)
+	}
 
 	stats, err := s.logRepo.GetTeamStats(ctx, req.EnvironmentID, from, to, sla)
 	if err != nil {
@@ -573,9 +630,63 @@ func (s *conversationServiceImpl) GetPartnerDashboard(ctx context.Context, req d
 	return &dto.PartnerDashboardResponse{Stats: stats}, nil
 }
 
+func (s *conversationServiceImpl) GetPersonalDashboard(ctx context.Context, memberID uuid.UUID, req dto.DashboardStatsRequest) (*dto.PersonalDashboardResponse, error) {
+	from, to := s.getPeriod(req.From, req.To)
+
+	// 1. Get Agent Stats
+	agentStats, err := s.GetAgentStats(ctx, uuid.Nil, req.EnvironmentID, memberID, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get Team Stats (Comparison)
+	teamStats, err := s.GetTeamStats(ctx, uuid.Nil, req.EnvironmentID, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Activity Timeline
+	timeline := s.calculateTimeline(ctx, memberID, req.EnvironmentID, from, to)
+
+	return &dto.PersonalDashboardResponse{
+		Stats:            agentStats,
+		ActivityTimeline: timeline,
+		TeamComparison:   teamStats,
+	}, nil
+}
+
+func (s *conversationServiceImpl) calculateTimeline(ctx context.Context, memberID, envID uuid.UUID, from, to time.Time) []dto.ActivityPoint {
+	// Auto-select bucket interval: hourly for ≤24h, daily for longer ranges
+	duration := to.Sub(from)
+	interval := "hour"
+	if duration > 24*time.Hour {
+		interval = "day"
+	}
+
+	entityPoints, err := s.logRepo.GetActivityTimeline(ctx, envID, memberID, from, to, interval)
+	if err != nil {
+		global.Logger.Error(fmt.Sprintf("PersonalDashboard: failed to fetch activity timeline: %v", err))
+		return []dto.ActivityPoint{}
+	}
+
+	// Map entity -> DTO
+	points := make([]dto.ActivityPoint, len(entityPoints))
+	for i, ep := range entityPoints {
+		points[i] = dto.ActivityPoint{
+			Time:  ep.Timestamp,
+			Value: ep.Value,
+		}
+	}
+
+	return points
+}
+
 func (s *conversationServiceImpl) GetAgentDashboard(ctx context.Context, memberID uuid.UUID, req dto.DashboardStatsRequest) (*dto.AgentDashboardResponse, error) {
 	from, to := s.getPeriod(req.From, req.To)
-	sla := s.getSLA(req.SLAThreshold)
+	sla := req.SLAThreshold
+	if sla <= 0 {
+		sla = s.getSLAThreshold(ctx, req.EnvironmentID)
+	}
 
 	stats, err := s.logRepo.GetAgentStats(ctx, req.EnvironmentID, memberID, from, to, sla)
 	if err != nil {
@@ -586,11 +697,82 @@ func (s *conversationServiceImpl) GetAgentDashboard(ctx context.Context, memberI
 }
 
 func (s *conversationServiceImpl) GetTeamStats(ctx context.Context, tenantID, envID uuid.UUID, from, to time.Time) (*entity.TeamStats, error) {
-	return s.logRepo.GetTeamStats(ctx, envID, from, to, 900) // Default 15m
+	sla := s.getSLAThreshold(ctx, envID)
+	return s.logRepo.GetTeamStats(ctx, envID, from, to, sla)
 }
 
 func (s *conversationServiceImpl) GetAgentStats(ctx context.Context, tenantID, envID uuid.UUID, memberID uuid.UUID, from, to time.Time) (*entity.AgentStats, error) {
-	return s.logRepo.GetAgentStats(ctx, envID, memberID, from, to, 900) // Default 15m
+	sla := s.getSLAThreshold(ctx, envID)
+	return s.logRepo.GetAgentStats(ctx, envID, memberID, from, to, sla)
+}
+
+func (s *conversationServiceImpl) getSLAThreshold(ctx context.Context, envID uuid.UUID) int {
+	if envID == uuid.Nil {
+		return 900
+	}
+
+	env, err := s.envRepo.GetByID(ctx, envID)
+	if err == nil && env != nil {
+		if env.SLAThresholdSeconds > 0 {
+			return env.SLAThresholdSeconds
+		}
+		// Fallback to app SLA
+		app, err := s.appRepo.GetByID(ctx, env.AppID)
+		if err == nil && app != nil && app.SLAThresholdSeconds > 0 {
+			return app.SLAThresholdSeconds
+		}
+	}
+
+	return 900 // Default 15m
+}
+
+func (s *conversationServiceImpl) GetThreadAuditTrail(ctx context.Context, envID, threadID uuid.UUID) (*dto.AuditTrailResponse, error) {
+	// 1. Security Check
+	_, err := s.threadRepo.GetByIDAndEnv(ctx, threadID, envID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Fetch Logs
+	logs, err := s.logRepo.GetByThread(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Enrich Names
+	// Use a map to avoid redundant DB calls if multiple logs are for same member
+	nameMap := make(map[uuid.UUID]string)
+
+	enrichedLogs := make([]*dto.AssignmentLogResponse, len(logs))
+	for i, l := range logs {
+		enrichedLogs[i] = &dto.AssignmentLogResponse{
+			ID:                  l.ID,
+			ThreadID:            l.ThreadID,
+			AssignedToMemberID:  l.AssignedToMemberID,
+			AssignedAt:          l.AssignedAt,
+			ResolvedAt:          l.ResolvedAt,
+			ResponseTimeSeconds: l.ResponseTimeSeconds,
+		}
+
+		if l.AssignedToMemberID != nil {
+			memberID := *l.AssignedToMemberID
+			if name, ok := nameMap[memberID]; ok {
+				enrichedLogs[i].AssignedToDisplayName = name
+			} else {
+				// Fetch Member from IAM
+				member, err := s.memberRepo.GetByID(ctx, memberID)
+				if err == nil && member != nil && member.User != nil && member.User.FullName != nil {
+					nameMap[memberID] = *member.User.FullName
+					enrichedLogs[i].AssignedToDisplayName = *member.User.FullName
+				}
+			}
+		}
+	}
+
+	return &dto.AuditTrailResponse{
+		ThreadID: threadID,
+		Logs:     enrichedLogs,
+	}, nil
 }
 
 func (s *conversationServiceImpl) getPeriod(from, to time.Time) (time.Time, time.Time) {
@@ -602,10 +784,20 @@ func (s *conversationServiceImpl) getPeriod(from, to time.Time) (time.Time, time
 	}
 	return from, to
 }
-
-func (s *conversationServiceImpl) getSLA(threshold int) int {
-	if threshold <= 0 {
-		return 900 // Default 15m
+func (s *conversationServiceImpl) broadcastEvent(envID uuid.UUID, eventType string, payload interface{}) {
+	if s.hub == nil {
+		return
 	}
-	return threshold
+
+	event := dto.WsEvent{
+		Type:    eventType,
+		Payload: payload,
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		return
+	}
+
+	s.hub.BroadcastToEnvironment(envID, data)
 }

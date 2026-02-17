@@ -5,6 +5,9 @@ import (
 	"testing"
 	"time"
 
+	appsEntity "CONVERDA/internal/apps/domain/model/entity"
+	iamEntity "CONVERDA/internal/iam/domain/model/entity"
+	iamRepo "CONVERDA/internal/iam/domain/repository"
 	"CONVERDA/internal/messaging/application/service/impl"
 	"CONVERDA/internal/messaging/domain/model/entity"
 	domainRepo "CONVERDA/internal/messaging/domain/repository"
@@ -101,6 +104,11 @@ func (m *MockThreadRepository) GetDirectThreadBetweenEntities(ctx context.Contex
 	return args.Get(0).(*entity.Thread), args.Error(1)
 }
 
+func (m *MockThreadRepository) MarkAsOverdue(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 type MockSubscriberRepository struct {
 	mock.Mock
 }
@@ -149,6 +157,122 @@ func (m *MockAssignmentLogRepository) GetAgentStats(ctx context.Context, envID u
 	return args.Get(0).(*entity.AgentStats), args.Error(1)
 }
 
+func (m *MockAssignmentLogRepository) GetActivityTimeline(ctx context.Context, envID, memberID uuid.UUID, from, to time.Time, interval string) ([]*entity.ActivityPoint, error) {
+	args := m.Called(ctx, envID, memberID, from, to, interval)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*entity.ActivityPoint), args.Error(1)
+}
+
+func (m *MockAssignmentLogRepository) GetByThread(ctx context.Context, threadID uuid.UUID) ([]*entity.AssignmentLog, error) {
+	args := m.Called(ctx, threadID)
+	return args.Get(0).([]*entity.AssignmentLog), args.Error(1)
+}
+
+type MockMemberRepository struct {
+	mock.Mock
+}
+
+func (m *MockMemberRepository) GetByID(ctx context.Context, id uuid.UUID) (*iamEntity.TenantMember, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*iamEntity.TenantMember), args.Error(1)
+}
+
+func (m *MockMemberRepository) Create(ctx context.Context, member *iamEntity.TenantMember) (*iamEntity.TenantMember, error) {
+	return nil, nil
+}
+func (m *MockMemberRepository) GetByTenantAndUser(ctx context.Context, tenantID, userID uuid.UUID) (*iamEntity.TenantMember, error) {
+	return nil, nil
+}
+func (m *MockMemberRepository) GetAll(ctx context.Context, filters iamRepo.TenantMemberFilters) ([]*iamEntity.TenantMember, error) {
+	return nil, nil
+}
+func (m *MockMemberRepository) CountAll(ctx context.Context, filters iamRepo.TenantMemberFilters) (int64, error) {
+	return 0, nil
+}
+func (m *MockMemberRepository) GetByTenantID(ctx context.Context, tenantID uuid.UUID) ([]*iamEntity.TenantMember, error) {
+	return nil, nil
+}
+func (m *MockMemberRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*iamEntity.TenantMember, error) {
+	return nil, nil
+}
+func (m *MockMemberRepository) Update(ctx context.Context, member *iamEntity.TenantMember) error {
+	return nil
+}
+func (m *MockMemberRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+func (m *MockMemberRepository) AssignRole(ctx context.Context, memberID, roleID uuid.UUID) error {
+	return nil
+}
+func (m *MockMemberRepository) RemoveRole(ctx context.Context, memberID uuid.UUID) error {
+	return nil
+}
+func (m *MockMemberRepository) ExistsByTenantAndUser(ctx context.Context, tenantID, userID uuid.UUID) (bool, error) {
+	return false, nil
+}
+func (m *MockMemberRepository) GetByTenantUserAndApp(ctx context.Context, tenantID, userID uuid.UUID, appID *uuid.UUID) (*iamEntity.TenantMember, error) {
+	return nil, nil
+}
+
+type MockAppRepository struct {
+	mock.Mock
+}
+
+func (m *MockAppRepository) Create(ctx context.Context, app *appsEntity.App) (*appsEntity.App, error) {
+	return nil, nil
+}
+func (m *MockAppRepository) GetByID(ctx context.Context, id uuid.UUID) (*appsEntity.App, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*appsEntity.App), args.Error(1)
+}
+func (m *MockAppRepository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]*appsEntity.App, error) {
+	return nil, nil
+}
+func (m *MockAppRepository) Update(ctx context.Context, app *appsEntity.App) error {
+	return nil
+}
+func (m *MockAppRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+type MockEnvironmentRepository struct {
+	mock.Mock
+}
+
+func (m *MockEnvironmentRepository) Create(ctx context.Context, env *appsEntity.Environment) (*appsEntity.Environment, error) {
+	return nil, nil
+}
+func (m *MockEnvironmentRepository) GetByID(ctx context.Context, id uuid.UUID) (*appsEntity.Environment, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*appsEntity.Environment), args.Error(1)
+}
+func (m *MockEnvironmentRepository) GetByAppAndCode(ctx context.Context, appID uuid.UUID, code string) (*appsEntity.Environment, error) {
+	return nil, nil
+}
+func (m *MockEnvironmentRepository) ListByApp(ctx context.Context, appID uuid.UUID) ([]*appsEntity.Environment, error) {
+	return nil, nil
+}
+func (m *MockEnvironmentRepository) GetByAPIKey(ctx context.Context, apiKey string) (*appsEntity.Environment, error) {
+	return nil, nil
+}
+func (m *MockEnvironmentRepository) Update(ctx context.Context, env *appsEntity.Environment) error {
+	return nil
+}
+func (m *MockEnvironmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
 // --- Tests ---
 
 func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
@@ -161,8 +285,11 @@ func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
 	mockThreadRepo := new(MockThreadRepository)
 	mockSubRepo := new(MockSubscriberRepository)
 	mockLogRepo := new(MockAssignmentLogRepository)
+	mockMemberRepo := new(MockMemberRepository)
+	mockAppRepo := new(MockAppRepository)
+	mockEnvRepo := new(MockEnvironmentRepository)
 
-	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo)
+	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo, mockMemberRepo, mockAppRepo, mockEnvRepo, nil)
 
 	t.Run("creates new thread between user and subscriber", func(t *testing.T) {
 		// Mock: Create thread succeeds
@@ -217,8 +344,11 @@ func TestConversationService_CreateGroupThread(t *testing.T) {
 	mockThreadRepo := new(MockThreadRepository)
 	mockSubRepo := new(MockSubscriberRepository)
 	mockLogRepo := new(MockAssignmentLogRepository)
+	mockMemberRepo := new(MockMemberRepository)
+	mockAppRepo := new(MockAppRepository)
+	mockEnvRepo := new(MockEnvironmentRepository)
 
-	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo)
+	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo, mockMemberRepo, mockAppRepo, mockEnvRepo, nil)
 
 	t.Run("creates group with mixed participants", func(t *testing.T) {
 		participants := []*entity.ThreadParticipant{

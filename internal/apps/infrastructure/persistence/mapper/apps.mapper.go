@@ -10,12 +10,13 @@ func ToAppEntity(m *model.AppModel) *entity.App {
 		return nil
 	}
 	app := &entity.App{
-		ID:          m.ID,
-		TenantID:    m.TenantID,
-		Name:        m.Name,
-		Description: m.Description,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
+		ID:                  m.ID,
+		TenantID:            m.TenantID,
+		Name:                m.Name,
+		Description:         m.Description,
+		CreatedAt:           m.CreatedAt,
+		UpdatedAt:           m.UpdatedAt,
+		SLAThresholdSeconds: m.SLAThresholdSeconds,
 	}
 
 	if len(m.Environments) > 0 {
@@ -33,12 +34,13 @@ func ToAppModel(e *entity.App) *model.AppModel {
 		return nil
 	}
 	return &model.AppModel{
-		ID:          e.ID,
-		TenantID:    e.TenantID,
-		Name:        e.Name,
-		Description: e.Description,
-		CreatedAt:   e.CreatedAt,
-		UpdatedAt:   e.UpdatedAt,
+		ID:                  e.ID,
+		TenantID:            e.TenantID,
+		Name:                e.Name,
+		Description:         e.Description,
+		CreatedAt:           e.CreatedAt,
+		UpdatedAt:           e.UpdatedAt,
+		SLAThresholdSeconds: e.SLAThresholdSeconds,
 	}
 }
 
@@ -47,11 +49,14 @@ func ToEnvironmentEntity(m *model.EnvironmentModel) *entity.Environment {
 		return nil
 	}
 	env := &entity.Environment{
-		ID:              m.ID,
-		AppID:           m.AppID,
-		EnvironmentCode: m.EnvironmentCode,
-		CreatedAt:       m.CreatedAt,
-		UpdatedAt:       m.UpdatedAt,
+		ID:                  m.ID,
+		AppID:               m.AppID,
+		EnvironmentCode:     m.EnvironmentCode,
+		CreatedAt:           m.CreatedAt,
+		UpdatedAt:           m.UpdatedAt,
+		SLAThresholdSeconds: m.SLAThresholdSeconds,
+		RateLimitRPM:        m.RateLimitRPM,
+		RateLimitDaily:      m.RateLimitDaily,
 	}
 
 	if len(m.Keys) > 0 {
@@ -69,11 +74,14 @@ func ToEnvironmentModel(e *entity.Environment) *model.EnvironmentModel {
 		return nil
 	}
 	return &model.EnvironmentModel{
-		ID:              e.ID,
-		AppID:           e.AppID,
-		EnvironmentCode: e.EnvironmentCode,
-		CreatedAt:       e.CreatedAt,
-		UpdatedAt:       e.UpdatedAt,
+		ID:                  e.ID,
+		AppID:               e.AppID,
+		EnvironmentCode:     e.EnvironmentCode,
+		CreatedAt:           e.CreatedAt,
+		UpdatedAt:           e.UpdatedAt,
+		SLAThresholdSeconds: e.SLAThresholdSeconds,
+		RateLimitRPM:        e.RateLimitRPM,
+		RateLimitDaily:      e.RateLimitDaily,
 	}
 }
 

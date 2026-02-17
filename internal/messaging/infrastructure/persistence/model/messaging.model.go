@@ -26,9 +26,11 @@ type ThreadModel struct {
 	ID            uuid.UUID      `gorm:"type:uuid;primary_key;default:generate_uuid_v7()"`
 	EnvironmentID uuid.UUID      `gorm:"type:uuid;not null"`
 	Type          string         `gorm:"type:text;not null;default:'support'"`
+	Channel       string         `gorm:"type:text;not null;default:'web'"`
 	Status        string         `gorm:"type:text;not null;default:'unassigned'"`
 	Metadata      datatypes.JSON `gorm:"type:jsonb;default:'{}'"`
 	ReferenceHash *string        `gorm:"type:text;uniqueIndex"`
+	IsOverdue     bool           `gorm:"type:boolean;not null;default:false"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }

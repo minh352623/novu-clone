@@ -497,6 +497,11 @@ definitions:
     required:
     - participants
     type: object
+  CONVERDA_internal_messaging_controller_dto.AgentDashboardResponse:
+    properties:
+      stats:
+        $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.AgentStats'
+    type: object
   CONVERDA_internal_messaging_controller_dto.AgentStatsResponse:
     properties:
       avg_response_time:
@@ -550,6 +555,9 @@ definitions:
     type: object
   CONVERDA_internal_messaging_controller_dto.InboundMessageRequest:
     properties:
+      channel:
+        description: Optional, default "api" or "web"
+        type: string
       content:
         type: object
       environment_id:
@@ -620,12 +628,24 @@ definitions:
       entity_type:
         type: string
     type: object
+  CONVERDA_internal_messaging_controller_dto.PartnerDashboardResponse:
+    properties:
+      stats:
+        allOf:
+        - $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats'
+        description: Partner dashboard uses TeamStats for now
+    type: object
   CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest:
     properties:
       content:
         type: object
     required:
     - content
+    type: object
+  CONVERDA_internal_messaging_controller_dto.TeamDashboardResponse:
+    properties:
+      stats:
+        $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats'
     type: object
   CONVERDA_internal_messaging_controller_dto.TeamStatsResponse:
     properties:
@@ -640,6 +660,8 @@ definitions:
     type: object
   CONVERDA_internal_messaging_controller_dto.ThreadResponse:
     properties:
+      channel:
+        type: string
       created_at:
         type: string
       environment_id:
@@ -667,6 +689,176 @@ definitions:
         type: string
     required:
     - name
+    type: object
+  CONVERDA_internal_messaging_domain_model_entity.AgentStats:
+    properties:
+      avg_response_time:
+        type: number
+      current_open_threads:
+        type: integer
+      member_id:
+        type: string
+      response_time_distribution:
+        $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.ResponseTimeDistribution'
+      total_assigned:
+        type: integer
+      total_resolved:
+        type: integer
+      workload:
+        description: Same as CurrentOpenThreads for now
+        type: integer
+    type: object
+  CONVERDA_internal_messaging_domain_model_entity.ResponseTimeDistribution:
+    properties:
+      from_5_to_15m:
+        type: integer
+      over_15m:
+        type: integer
+      under_5m:
+        type: integer
+    type: object
+  CONVERDA_internal_messaging_domain_model_entity.TeamStats:
+    properties:
+      avg_response_time:
+        type: number
+      resolved_count:
+        type: integer
+      response_time_distribution:
+        $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.ResponseTimeDistribution'
+      sla_compliance_rate:
+        type: number
+      total_conversations:
+        type: integer
+    type: object
+  CONVERDA_internal_notification_controller_dto.CreateGroupRequest:
+    properties:
+      description:
+        type: string
+      is_default:
+        type: boolean
+      key:
+        type: string
+      name:
+        type: string
+    required:
+    - key
+    - name
+    type: object
+  CONVERDA_internal_notification_controller_dto.CreateLayoutRequest:
+    properties:
+      content_html:
+        type: string
+      description:
+        type: string
+      is_default:
+        type: boolean
+      name:
+        type: string
+      variables_schema:
+        additionalProperties: true
+        type: object
+    required:
+    - content_html
+    - name
+    type: object
+  CONVERDA_internal_notification_controller_dto.GroupResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_default:
+        type: boolean
+      key:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  CONVERDA_internal_notification_controller_dto.LayoutResponse:
+    properties:
+      content_html:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_default:
+        type: boolean
+      name:
+        type: string
+      updated_at:
+        type: string
+      variables_schema:
+        additionalProperties: true
+        type: object
+    type: object
+  CONVERDA_internal_notification_controller_dto.NotificationResponse:
+    properties:
+      notification_id:
+        type: string
+      status:
+        type: string
+    type: object
+  CONVERDA_internal_notification_controller_dto.PaginatedResponse:
+    properties:
+      data: {}
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  CONVERDA_internal_notification_controller_dto.SendNotificationRequest:
+    properties:
+      channel:
+        enum:
+        - email
+        - sms
+        - push
+        type: string
+      data:
+        additionalProperties: true
+        type: object
+      language:
+        description: Optional, default 'en'
+        type: string
+      recipient:
+        description: Validate email format
+        type: string
+      template_code:
+        type: string
+    required:
+    - channel
+    - recipient
+    - template_code
+    type: object
+  CONVERDA_internal_notification_controller_dto.UpdateGroupRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  CONVERDA_internal_notification_controller_dto.UpdateLayoutRequest:
+    properties:
+      content_html:
+        type: string
+      description:
+        type: string
+      is_default:
+        type: boolean
+      name:
+        type: string
+      variables_schema:
+        additionalProperties: true
+        type: object
     type: object
   CONVERDA_internal_r2_service_dto.ImageDTO:
     properties:
@@ -1297,15 +1489,26 @@ paths:
         name: id
         required: true
         type: string
+      - description: Pagination Cursor (Base64)
+        in: query
+        name: cursor
+        type: string
+      - description: 'Direction: ''before'' (older) or ''after'' (newer)'
+        in: query
+        name: direction
+        type: string
+      - description: Limit (default 20)
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse'
-            type: array
+            additionalProperties: true
+            type: object
       summary: Get Conversation Thread
       tags:
       - Messaging
@@ -1620,6 +1823,117 @@ paths:
       summary: Receive Inbound Message
       tags:
       - Messaging
+  /conversations/ws:
+    get:
+      description: Connect to WebSocket for real-time updates
+      responses: {}
+      summary: WebSocket Connection
+      tags:
+      - Messaging
+  /dashboards/agent/{member_id}:
+    get:
+      description: Get comprehensive agent performance metrics
+      parameters:
+      - description: Member ID
+        in: path
+        name: member_id
+        required: true
+        type: string
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      - description: From Time (RFC3339)
+        in: query
+        name: from
+        type: string
+      - description: To Time (RFC3339)
+        in: query
+        name: to
+        type: string
+      - description: SLA Threshold in seconds
+        in: query
+        name: sla_threshold
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.AgentDashboardResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Agent Dashboard
+      tags:
+      - Dashboards
+  /dashboards/partner:
+    get:
+      description: Get comprehensive partner performance metrics
+      parameters:
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      - description: From Time (RFC3339)
+        in: query
+        name: from
+        type: string
+      - description: To Time (RFC3339)
+        in: query
+        name: to
+        type: string
+      - description: SLA Threshold in seconds
+        in: query
+        name: sla_threshold
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.PartnerDashboardResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Partner Dashboard
+      tags:
+      - Dashboards
+  /dashboards/team:
+    get:
+      description: Get comprehensive team performance metrics
+      parameters:
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      - description: From Time (RFC3339)
+        in: query
+        name: from
+        type: string
+      - description: To Time (RFC3339)
+        in: query
+        name: to
+        type: string
+      - description: SLA Threshold in seconds
+        in: query
+        name: sla_threshold
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.TeamDashboardResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Team Dashboard
+      tags:
+      - Dashboards
   /environments/{id}/api-keys:
     get:
       parameters:
@@ -1714,6 +2028,254 @@ paths:
       summary: Accept invitation
       tags:
       - Invitations
+  /notifications/groups:
+    get:
+      description: List notification groups
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: List Notification Groups
+      tags:
+      - Notification
+    post:
+      consumes:
+      - application/json
+      description: Create a new notification group (category)
+      parameters:
+      - description: Group Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.CreateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.GroupResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Notification Group
+      tags:
+      - Notification
+  /notifications/groups/{id}:
+    delete:
+      description: Delete a notification group
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Delete Notification Group
+      tags:
+      - Notification
+    get:
+      description: Get a notification group by ID
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.GroupResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Notification Group
+      tags:
+      - Notification
+    patch:
+      consumes:
+      - application/json
+      description: Update a notification group
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Group Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.UpdateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Update Notification Group
+      tags:
+      - Notification
+  /notifications/layouts:
+    get:
+      description: List notification layouts
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: List Notification Layouts
+      tags:
+      - Notification
+    post:
+      consumes:
+      - application/json
+      description: Create a new notification layout
+      parameters:
+      - description: Layout Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.CreateLayoutRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.LayoutResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Notification Layout
+      tags:
+      - Notification
+  /notifications/layouts/{id}:
+    delete:
+      description: Delete a notification layout
+      parameters:
+      - description: Layout ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Delete Notification Layout
+      tags:
+      - Notification
+    get:
+      description: Get a notification layout by ID
+      parameters:
+      - description: Layout ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.LayoutResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Notification Layout
+      tags:
+      - Notification
+    patch:
+      consumes:
+      - application/json
+      description: Update a notification layout
+      parameters:
+      - description: Layout ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Layout Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.UpdateLayoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Update Notification Layout
+      tags:
+      - Notification
+  /notifications/send:
+    post:
+      consumes:
+      - application/json
+      description: Send a notification via configured channel
+      parameters:
+      - description: Notification Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.SendNotificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.NotificationResponse'
+      security:
+      - BearerAuth: []
+      summary: Send Notification
+      tags:
+      - Notification
   /pricing-plans:
     get:
       consumes:

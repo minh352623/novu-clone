@@ -66,6 +66,11 @@ func (r *environmentRepository) GetByAPIKey(ctx context.Context, apiKey string) 
 	return mapper.ToEnvironmentEntity(&m), nil
 }
 
+func (r *environmentRepository) Update(ctx context.Context, env *entity.Environment) error {
+	m := mapper.ToEnvironmentModel(env)
+	return r.db.WithContext(ctx).Save(m).Error
+}
+
 func (r *environmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&model.EnvironmentModel{}, "id = ?", id).Error
 }

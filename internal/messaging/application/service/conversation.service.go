@@ -29,6 +29,7 @@ type ConversationService interface {
 	AddGroupParticipants(ctx context.Context, envID, threadID uuid.UUID, participants []*entity.ThreadParticipant) error
 	RemoveGroupParticipant(ctx context.Context, envID, threadID uuid.UUID, entityType string, entityID uuid.UUID) error
 	MarkThreadRead(ctx context.Context, envID, threadID, memberID uuid.UUID) error
+	GetThreadAuditTrail(ctx context.Context, envID, threadID uuid.UUID) (*dto.AuditTrailResponse, error)
 
 	// Assignment
 	AssignThread(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID, memberID uuid.UUID) error
@@ -40,6 +41,7 @@ type ConversationService interface {
 	GetTeamDashboard(ctx context.Context, req dto.DashboardStatsRequest) (*dto.TeamDashboardResponse, error)
 	GetPartnerDashboard(ctx context.Context, req dto.DashboardStatsRequest) (*dto.PartnerDashboardResponse, error)
 	GetAgentDashboard(ctx context.Context, memberID uuid.UUID, req dto.DashboardStatsRequest) (*dto.AgentDashboardResponse, error)
+	GetPersonalDashboard(ctx context.Context, memberID uuid.UUID, req dto.DashboardStatsRequest) (*dto.PersonalDashboardResponse, error)
 
 	// Deprecated: Use Dashboard methods
 	GetTeamStats(ctx context.Context, tenantID, envID uuid.UUID, from, to time.Time) (*entity.TeamStats, error)

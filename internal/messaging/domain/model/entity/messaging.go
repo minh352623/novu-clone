@@ -28,6 +28,7 @@ type Thread struct {
 	ReferenceHash *string         `json:"reference_hash,omitempty"`
 	CreatedAt     time.Time       `json:"created_at"`
 	UpdatedAt     time.Time       `json:"updated_at"`
+	IsOverdue     bool            `json:"is_overdue"`
 
 	// Enriched
 	Participants []*ThreadParticipant `json:"participants,omitempty"`
@@ -182,4 +183,9 @@ type AgentStats struct {
 	CurrentOpenThreads       int                      `json:"current_open_threads"`
 	Workload                 int                      `json:"workload"` // Same as CurrentOpenThreads for now
 	ResponseTimeDistribution ResponseTimeDistribution `json:"response_time_distribution"`
+}
+
+type ActivityPoint struct {
+	Timestamp time.Time `json:"timestamp"`
+	Value     int       `json:"value"`
 }

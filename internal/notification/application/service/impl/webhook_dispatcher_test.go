@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/notification/domain/entity"
+	"CONVERDA/pkg/logger"
+	"CONVERDA/pkg/setting"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +45,23 @@ func (m *MockWebhookLogRepository) Update(ctx context.Context, log *entity.Webho
 	return args.Error(0)
 }
 
+func (m *MockWebhookLogRepository) GetPendingRetries(ctx context.Context, limit int) ([]*entity.WebhookLog, error) {
+	args := m.Called(ctx, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*entity.WebhookLog), args.Error(1)
+}
+
+func setupTestLogger() {
+	global.Logger = logger.NewLogger(setting.LoggerSetting{
+		LogLevel: "debug",
+	})
+}
+
 func TestWebhookDispatcher_Dispatch(t *testing.T) {
+	setupTestLogger()
+
 	// 1. Setup Mock Server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify Headers
@@ -80,15 +99,53 @@ func TestWebhookDispatcher_Dispatch(t *testing.T) {
 
 	// 3. Execute
 	dispatcher := NewWebhookDispatcher(mockRepo, mockLogRepo)
-
-	// Use a WaitGroup or similar if we want to wait for the goroutine,
-	// but for this simple test we might need a small sleep since Dispatch is async.
 	dispatcher.Dispatch(context.Background(), envID, "test.event", map[string]string{"foo": "bar"})
 
 	// Allow goroutine to finish
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// 4. Verify
+	mockRepo.AssertExpectations(t)
+	mockLogRepo.AssertExpectations(t)
+}
+
+func TestWebhookDispatcher_FailureSchedulesRetry(t *testing.T) {
+	setupTestLogger()
+
+	// Server that always returns 500
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error"))
+	}))
+	defer server.Close()
+
+	mockRepo := new(MockWebhookRepository)
+	mockLogRepo := new(MockWebhookLogRepository)
+
+	envID := uuid.New()
+	webhook := &entity.Webhook{
+		ID:            uuid.New(),
+		TenantID:      uuid.New(),
+		EnvironmentID: envID,
+		URL:           server.URL,
+		Events:        []string{"test.event"},
+		IsActive:      true,
+	}
+
+	mockRepo.On("GetByEvent", mock.Anything, envID, "test.event").Return([]*entity.Webhook{webhook}, nil)
+	mockLogRepo.On("Create", mock.Anything, mock.AnythingOfType("*entity.WebhookLog")).Return(nil)
+	mockLogRepo.On("Update", mock.Anything, mock.MatchedBy(func(log *entity.WebhookLog) bool {
+		// Verify retry is scheduled
+		return log.Status == entity.WebhookLogStatusFailed &&
+			log.RetryCount == 1 &&
+			log.NextRetryAt != nil
+	})).Return(nil)
+
+	dispatcher := NewWebhookDispatcher(mockRepo, mockLogRepo)
+	dispatcher.Dispatch(context.Background(), envID, "test.event", map[string]string{"foo": "bar"})
+
+	time.Sleep(200 * time.Millisecond)
+
 	mockRepo.AssertExpectations(t)
 	mockLogRepo.AssertExpectations(t)
 }

@@ -89,6 +89,22 @@ func (r *StubTemplateRepository) GetByID(ctx context.Context, id uuid.UUID) (*en
 	}, nil
 }
 
+func (r *StubTemplateRepository) CreateContent(ctx context.Context, content *entity.TemplateContent) error {
+	return nil
+}
+
+func (r *StubTemplateRepository) UpdateContent(ctx context.Context, content *entity.TemplateContent) error {
+	return nil
+}
+
+func (r *StubTemplateRepository) GetContent(ctx context.Context, templateID uuid.UUID, version int, lang string) (*entity.TemplateContent, error) {
+	return nil, nil
+}
+
+func (r *StubTemplateRepository) ListLanguages(ctx context.Context, templateID uuid.UUID, version int) ([]string, error) {
+	return []string{"en"}, nil
+}
+
 // InMemory Provider Config Repo
 type StubProviderConfigRepository struct{}
 

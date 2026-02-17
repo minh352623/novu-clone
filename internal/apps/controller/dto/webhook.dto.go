@@ -10,30 +10,39 @@ import (
 
 // Webhook DTOs
 type CreateWebhookRequest struct {
-	EnvironmentID uuid.UUID `json:"environment_id" binding:"required"`
-	URL           string    `json:"url" binding:"required,url"`
-	Events        []string  `json:"events"`
-	Description   *string   `json:"description"`
+	EnvironmentID       uuid.UUID `json:"environment_id" binding:"required"`
+	URL                 string    `json:"url" binding:"required,url"`
+	Events              []string  `json:"events"`
+	Description         *string   `json:"description"`
+	MaxRetries          *int      `json:"max_retries,omitempty"`
+	RetryBackoffSeconds *int      `json:"retry_backoff_seconds,omitempty"`
+	RetryTimeoutSeconds *int      `json:"retry_timeout_seconds,omitempty"`
 }
 
 type UpdateWebhookRequest struct {
-	URL         *string  `json:"url"`
-	Events      []string `json:"events"`
-	Description *string  `json:"description"`
-	IsActive    *bool    `json:"is_active"`
+	URL                 *string  `json:"url"`
+	Events              []string `json:"events"`
+	Description         *string  `json:"description"`
+	IsActive            *bool    `json:"is_active"`
+	MaxRetries          *int     `json:"max_retries,omitempty"`
+	RetryBackoffSeconds *int     `json:"retry_backoff_seconds,omitempty"`
+	RetryTimeoutSeconds *int     `json:"retry_timeout_seconds,omitempty"`
 }
 
 type WebhookResponse struct {
-	ID            uuid.UUID `json:"id"`
-	TenantID      uuid.UUID `json:"tenant_id"`
-	AppID         uuid.UUID `json:"app_id"`
-	EnvironmentID uuid.UUID `json:"environment_id"`
-	URL           string    `json:"url"`
-	Secret        string    `json:"secret"`
-	Description   *string   `json:"description,omitempty"`
-	Events        []string  `json:"events"`
-	IsActive      bool      `json:"is_active"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                  uuid.UUID `json:"id"`
+	TenantID            uuid.UUID `json:"tenant_id"`
+	AppID               uuid.UUID `json:"app_id"`
+	EnvironmentID       uuid.UUID `json:"environment_id"`
+	URL                 string    `json:"url"`
+	Secret              string    `json:"secret"`
+	Description         *string   `json:"description,omitempty"`
+	Events              []string  `json:"events"`
+	IsActive            bool      `json:"is_active"`
+	MaxRetries          int       `json:"max_retries"`
+	RetryBackoffSeconds int       `json:"retry_backoff_seconds"`
+	RetryTimeoutSeconds int       `json:"retry_timeout_seconds"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 func ToWebhookResponse(w *entity.Webhook) *WebhookResponse {
@@ -41,16 +50,19 @@ func ToWebhookResponse(w *entity.Webhook) *WebhookResponse {
 		return nil
 	}
 	return &WebhookResponse{
-		ID:            w.ID,
-		TenantID:      w.TenantID,
-		AppID:         w.AppID,
-		EnvironmentID: w.EnvironmentID,
-		URL:           w.URL,
-		Secret:        w.Secret,
-		Description:   w.Description,
-		Events:        w.Events,
-		IsActive:      w.IsActive,
-		CreatedAt:     w.CreatedAt,
+		ID:                  w.ID,
+		TenantID:            w.TenantID,
+		AppID:               w.AppID,
+		EnvironmentID:       w.EnvironmentID,
+		URL:                 w.URL,
+		Secret:              w.Secret,
+		Description:         w.Description,
+		Events:              w.Events,
+		IsActive:            w.IsActive,
+		MaxRetries:          w.MaxRetries,
+		RetryBackoffSeconds: w.RetryBackoffSeconds,
+		RetryTimeoutSeconds: w.RetryTimeoutSeconds,
+		CreatedAt:           w.CreatedAt,
 	}
 }
 

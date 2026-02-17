@@ -14,13 +14,14 @@ var (
 )
 
 type App struct {
-	ID           uuid.UUID      `json:"id"`
-	TenantID     uuid.UUID      `json:"tenant_id"`
-	Name         string         `json:"name"`
-	Description  *string        `json:"description,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	Environments []*Environment `json:"environments,omitempty"`
+	ID                  uuid.UUID      `json:"id"`
+	TenantID            uuid.UUID      `json:"tenant_id"`
+	Name                string         `json:"name"`
+	Description         *string        `json:"description,omitempty"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	SLAThresholdSeconds int            `json:"sla_threshold_seconds"`
+	Environments        []*Environment `json:"environments,omitempty"`
 }
 
 func NewApp(tenantID uuid.UUID, name string, description *string) (*App, error) {
@@ -38,12 +39,15 @@ func NewApp(tenantID uuid.UUID, name string, description *string) (*App, error) 
 }
 
 type Environment struct {
-	ID              uuid.UUID `json:"id"`
-	AppID           uuid.UUID `json:"app_id"`
-	EnvironmentCode string    `json:"environment_code"`
-	Keys            []*APIKey `json:"keys,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                  uuid.UUID `json:"id"`
+	AppID               uuid.UUID `json:"app_id"`
+	EnvironmentCode     string    `json:"environment_code"`
+	SLAThresholdSeconds int       `json:"sla_threshold_seconds"`
+	RateLimitRPM        int       `json:"rate_limit_rpm"`   // max requests/minute, 0 = unlimited
+	RateLimitDaily      int       `json:"rate_limit_daily"` // max messages/day, 0 = unlimited
+	Keys                []*APIKey `json:"keys,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 func NewEnvironment(appID uuid.UUID, code string) (*Environment, error) {

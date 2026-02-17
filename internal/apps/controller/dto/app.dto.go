@@ -9,17 +9,20 @@ import (
 )
 
 type CreateAppRequest struct {
-	Name        string  `json:"name" binding:"required"`
-	Description *string `json:"description"`
+	Name                string  `json:"name" binding:"required"`
+	Description         *string `json:"description"`
+	SLAThresholdSeconds *int    `json:"sla_threshold_seconds"`
 }
 
 type UpdateAppRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
+	Name                *string `json:"name"`
+	Description         *string `json:"description"`
+	SLAThresholdSeconds *int    `json:"sla_threshold_seconds"`
 }
 
 type CreateEnvironmentRequest struct {
-	Code string `json:"code" binding:"required"`
+	Code                string `json:"code" binding:"required"`
+	SLAThresholdSeconds *int   `json:"sla_threshold_seconds"`
 }
 
 type APIKeyResponse struct {
@@ -38,11 +41,20 @@ type APIKeyFullResponse struct {
 }
 
 type EnvironmentResponse struct {
-	ID              uuid.UUID         `json:"id"`
-	AppID           uuid.UUID         `json:"app_id"`
-	EnvironmentCode string            `json:"environment_code"`
-	Keys            []*APIKeyResponse `json:"keys,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
+	ID                  uuid.UUID         `json:"id"`
+	AppID               uuid.UUID         `json:"app_id"`
+	EnvironmentCode     string            `json:"environment_code"`
+	SLAThresholdSeconds int               `json:"sla_threshold_seconds"`
+	RateLimitRPM        int               `json:"rate_limit_rpm"`
+	RateLimitDaily      int               `json:"rate_limit_daily"`
+	Keys                []*APIKeyResponse `json:"keys,omitempty"`
+	CreatedAt           time.Time         `json:"created_at"`
+}
+
+type UpdateEnvironmentConfigRequest struct {
+	SLAThresholdSeconds *int `json:"sla_threshold_seconds,omitempty"`
+	RateLimitRPM        *int `json:"rate_limit_rpm,omitempty"`
+	RateLimitDaily      *int `json:"rate_limit_daily,omitempty"`
 }
 
 type RotateKeyRequest struct {
@@ -50,13 +62,14 @@ type RotateKeyRequest struct {
 }
 
 type AppResponse struct {
-	ID           uuid.UUID              `json:"id"`
-	TenantID     uuid.UUID              `json:"tenant_id"`
-	Name         string                 `json:"name"`
-	Description  *string                `json:"description,omitempty"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
-	Environments []*EnvironmentResponse `json:"environments,omitempty"`
+	ID                  uuid.UUID              `json:"id"`
+	TenantID            uuid.UUID              `json:"tenant_id"`
+	Name                string                 `json:"name"`
+	Description         *string                `json:"description,omitempty"`
+	SLAThresholdSeconds int                    `json:"sla_threshold_seconds"`
+	CreatedAt           time.Time              `json:"created_at"`
+	UpdatedAt           time.Time              `json:"updated_at"`
+	Environments        []*EnvironmentResponse `json:"environments,omitempty"`
 }
 
 func ToEnvironmentResponse(env *entity.Environment) *EnvironmentResponse {
@@ -64,10 +77,13 @@ func ToEnvironmentResponse(env *entity.Environment) *EnvironmentResponse {
 		return nil
 	}
 	resp := &EnvironmentResponse{
-		ID:              env.ID,
-		AppID:           env.AppID,
-		EnvironmentCode: env.EnvironmentCode,
-		CreatedAt:       env.CreatedAt,
+		ID:                  env.ID,
+		AppID:               env.AppID,
+		EnvironmentCode:     env.EnvironmentCode,
+		SLAThresholdSeconds: env.SLAThresholdSeconds,
+		RateLimitRPM:        env.RateLimitRPM,
+		RateLimitDaily:      env.RateLimitDaily,
+		CreatedAt:           env.CreatedAt,
 	}
 
 	if len(env.Keys) > 0 {
@@ -116,12 +132,13 @@ func ToAppResponse(app *entity.App) *AppResponse {
 		return nil
 	}
 	resp := &AppResponse{
-		ID:          app.ID,
-		TenantID:    app.TenantID,
-		Name:        app.Name,
-		Description: app.Description,
-		CreatedAt:   app.CreatedAt,
-		UpdatedAt:   app.UpdatedAt,
+		ID:                  app.ID,
+		TenantID:            app.TenantID,
+		Name:                app.Name,
+		Description:         app.Description,
+		SLAThresholdSeconds: app.SLAThresholdSeconds,
+		CreatedAt:           app.CreatedAt,
+		UpdatedAt:           app.UpdatedAt,
 	}
 	if len(app.Environments) > 0 {
 		resp.Environments = ToEnvironmentResponseList(app.Environments)

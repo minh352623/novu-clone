@@ -8,10 +8,12 @@ import (
 	"CONVERDA/global"
 	"CONVERDA/internal/apps/controller"
 	initializeApps "CONVERDA/internal/initialize/apps"
+	initializeHealth "CONVERDA/internal/initialize/health"
 	initializeIAM "CONVERDA/internal/initialize/iam"
 	initializeMessaging "CONVERDA/internal/initialize/messaging"
 	initializeNotification "CONVERDA/internal/initialize/notification"
 	initializeR2 "CONVERDA/internal/initialize/r2"
+	initializeWorkflow "CONVERDA/internal/initialize/workflow"
 	"CONVERDA/internal/middleware"
 	r2Http "CONVERDA/internal/r2/controller/http"
 	"CONVERDA/pkg/response"
@@ -51,7 +53,6 @@ func InitRouter(db *sql.DB) *gin.Engine {
 		initializeIAM.InitIAMModule(v1, middleware.AuthMiddleware())
 
 		// Apps module routes
-		// Apps module routes
 		initializeApps.InitAppsModule(v1, middleware.AuthMiddleware())
 
 		// Messaging module routes
@@ -59,6 +60,12 @@ func InitRouter(db *sql.DB) *gin.Engine {
 
 		// Notification module routes
 		initializeNotification.InitNotificationModule(global.GormDB, v1)
+
+		// Health module routes (shared across modules)
+		initializeHealth.InitHealthModule(global.GormDB, v1, middleware.AuthMiddleware())
+
+		// Workflow Engine module routes
+		initializeWorkflow.InitWorkflowModule(global.GormDB, v1, middleware.AuthMiddleware())
 	}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

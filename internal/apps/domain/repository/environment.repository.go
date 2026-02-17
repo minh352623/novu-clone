@@ -14,5 +14,6 @@ type EnvironmentRepository interface {
 	GetByAppAndCode(ctx context.Context, appID uuid.UUID, code string) (*entity.Environment, error)
 	ListByApp(ctx context.Context, appID uuid.UUID) ([]*entity.Environment, error)
 	GetByAPIKey(ctx context.Context, apiKey string) (*entity.Environment, error)
+	Update(ctx context.Context, env *entity.Environment) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

@@ -26,3 +26,15 @@ type PartnerDashboardResponse struct {
 type AgentDashboardResponse struct {
 	Stats *entity.AgentStats `json:"stats"`
 }
+
+type ActivityPoint struct {
+	Time  time.Time `json:"time"`
+	Value int       `json:"value"`
+}
+
+type PersonalDashboardResponse struct {
+	Stats            *entity.AgentStats   `json:"stats"`
+	ActivityTimeline []ActivityPoint      `json:"activity_timeline"`
+	TeamComparison   *entity.TeamStats    `json:"team_comparison"`
+	TopPerformers    []*entity.AgentStats `json:"top_performers,omitempty"`
+}

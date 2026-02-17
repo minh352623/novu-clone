@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"CONVERDA/internal/messaging/domain/model/entity"
@@ -47,6 +48,30 @@ func (r *assignmentLogRepository) GetLastByThread(ctx context.Context, threadID 
 		ResolvedAt:          m.ResolvedAt,
 		ResponseTimeSeconds: m.ResponseTimeSeconds,
 	}, nil
+}
+
+func (r *assignmentLogRepository) GetByThread(ctx context.Context, threadID uuid.UUID) ([]*entity.AssignmentLog, error) {
+	var models []model.AssignmentLogModel
+	err := r.db.WithContext(ctx).
+		Where("thread_id = ?", threadID).
+		Order("assigned_at ASC").
+		Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*entity.AssignmentLog, len(models))
+	for i, m := range models {
+		result[i] = &entity.AssignmentLog{
+			ID:                  m.ID,
+			ThreadID:            m.ThreadID,
+			AssignedToMemberID:  m.AssignedToMemberID,
+			AssignedAt:          m.AssignedAt,
+			ResolvedAt:          m.ResolvedAt,
+			ResponseTimeSeconds: m.ResponseTimeSeconds,
+		}
+	}
+	return result, nil
 }
 
 func (r *assignmentLogRepository) Update(ctx context.Context, log *entity.AssignmentLog) error {
@@ -172,4 +197,24 @@ func (r *assignmentLogRepository) GetAgentStats(ctx context.Context, envID uuid.
 	stats.Workload = int(openCount)
 
 	return stats, nil
+}
+
+func (r *assignmentLogRepository) GetActivityTimeline(ctx context.Context, envID uuid.UUID, memberID uuid.UUID, from, to time.Time, interval string) ([]*entity.ActivityPoint, error) {
+	var points []*entity.ActivityPoint
+
+	// interval: 'hour' or 'day'
+	trunc := "hour"
+	if interval == "day" {
+		trunc = "day"
+	}
+
+	err := r.db.WithContext(ctx).Table("assignment_logs").
+		Joins("JOIN threads ON threads.id = assignment_logs.thread_id").
+		Where("threads.environment_id = ? AND assignment_logs.assigned_to_member_id = ? AND assignment_logs.resolved_at BETWEEN ? AND ?", envID, memberID, from, to).
+		Select(fmt.Sprintf("date_trunc('%s', assignment_logs.resolved_at) as timestamp, count(assignment_logs.id) as value", trunc)).
+		Group("timestamp").
+		Order("timestamp ASC").
+		Scan(&points).Error
+
+	return points, err
 }

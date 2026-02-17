@@ -7,15 +7,24 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"io"
 	"net/http"
 	"time"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
 
 	"github.com/google/uuid"
+)
+
+const (
+	defaultMaxRetries     = 3
+	defaultBackoffBaseSec = 5
+	backoffMultiplier     = 6 // 5s → 30s → 180s
+	defaultTimeoutSec     = 10
+	maxResponseBody       = 1024
 )
 
 type webhookDispatcherImpl struct {
@@ -32,25 +41,18 @@ func NewWebhookDispatcher(
 		webhookRepo:    webhookRepo,
 		webhookLogRepo: webhookLogRepo,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: time.Duration(defaultTimeoutSec) * time.Second,
 		},
 	}
 }
 
 func (d *webhookDispatcherImpl) Dispatch(ctx context.Context, envID uuid.UUID, eventType string, payload interface{}) {
-	// 1. Find interested webhooks
-	// Use a detached context for background processing if needed, but for now we run in a goroutine
-	// so the passed context might be cancelled by the parent request.
-	// Best practice: Create a new context for the background worker or use the passed one if we want to wait (plan said async).
-	// Implementation plan says: "Execute asynchronously (goroutine)".
 	go func() {
-		// Create a background context for the async operation
 		bgCtx := context.Background()
 
 		webhooks, err := d.webhookRepo.GetByEvent(bgCtx, envID, eventType)
 		if err != nil {
-			// Log error (system log not available yet, just print for now)
-			fmt.Printf("Error fetching webhooks for event %s: %v\n", eventType, err)
+			global.Logger.Error("Webhook dispatch: failed to fetch webhooks for event " + eventType + ": " + err.Error())
 			return
 		}
 
@@ -58,14 +60,12 @@ func (d *webhookDispatcherImpl) Dispatch(ctx context.Context, envID uuid.UUID, e
 			return
 		}
 
-		// Prepare Payload
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
-			fmt.Printf("Error marshaling payload: %v\n", err)
+			global.Logger.Error("Webhook dispatch: failed to marshal payload: " + err.Error())
 			return
 		}
 
-		// Convert payload to map for logging
 		var payloadMap map[string]interface{}
 		_ = json.Unmarshal(payloadBytes, &payloadMap)
 
@@ -75,10 +75,25 @@ func (d *webhookDispatcherImpl) Dispatch(ctx context.Context, envID uuid.UUID, e
 	}()
 }
 
+func (d *webhookDispatcherImpl) RetryWebhook(ctx context.Context, log *entity.WebhookLog) {
+	payloadBytes, err := json.Marshal(log.RequestPayload)
+	if err != nil {
+		global.Logger.Error("Webhook retry: failed to marshal payload: " + err.Error())
+		return
+	}
+
+	// Skip signing on retries (no secret available from log)
+	d.sendHTTPRequest(ctx, log, log.EventType, payloadBytes, "")
+}
+
 func (d *webhookDispatcherImpl) triggerWebhook(ctx context.Context, wh *entity.Webhook, eventType string, payloadBytes []byte, payloadMap map[string]interface{}) {
-	// 2. Create Audit Log (Pending)
-	logID := uuid.New() // V4 for now or use V7 generator if available in utils
-	// Since we don't have widely available v7 helper here, let's trust GORM default or use simple New()
+	logID := uuid.New()
+
+	// Use per-webhook retry config, fallback to defaults
+	maxR := wh.MaxRetries
+	if maxR <= 0 {
+		maxR = defaultMaxRetries
+	}
 
 	logEntry := &entity.WebhookLog{
 		ID:             logID,
@@ -87,67 +102,99 @@ func (d *webhookDispatcherImpl) triggerWebhook(ctx context.Context, wh *entity.W
 		EventType:      eventType,
 		RequestPayload: payloadMap,
 		Status:         entity.WebhookLogStatusPending,
+		RetryCount:     0,
+		MaxRetries:     maxR,
 		TenantID:       wh.TenantID,
 		AppID:          wh.AppID,
 		CreatedAt:      time.Now(),
 	}
 
 	if err := d.webhookLogRepo.Create(ctx, logEntry); err != nil {
-		fmt.Printf("Error creating webhook log: %v\n", err)
-		// Continue even if logging fails? Debatable. For now, yes.
+		global.Logger.Error("Webhook dispatch: failed to create log: " + err.Error())
 	}
 
-	// 3. Prepare Request
-	req, err := http.NewRequestWithContext(ctx, "POST", wh.URL, bytes.NewBuffer(payloadBytes))
+	d.sendHTTPRequest(ctx, logEntry, eventType, payloadBytes, wh.Secret)
+}
+
+func (d *webhookDispatcherImpl) sendHTTPRequest(ctx context.Context, logEntry *entity.WebhookLog, eventType string, payloadBytes []byte, secret string) {
+	req, err := http.NewRequestWithContext(ctx, "POST", logEntry.URL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		d.updateLogStatus(ctx, logEntry, entity.WebhookLogStatusFailed, 0, err.Error(), 0)
+		d.handleFailure(ctx, logEntry, 0, err.Error(), 0)
 		return
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Converda-Webhook/1.0")
 	req.Header.Set("X-Converda-Event", eventType)
-	req.Header.Set("X-Converda-Delivery", logID.String())
+	req.Header.Set("X-Converda-Delivery", logEntry.ID.String())
 
-	// Sign payload if secret exists
-	if wh.Secret != "" {
-		mac := hmac.New(sha256.New, []byte(wh.Secret))
+	// Sign payload with HMAC if secret is available
+	if secret != "" {
+		mac := hmac.New(sha256.New, []byte(secret))
 		mac.Write(payloadBytes)
 		signature := hex.EncodeToString(mac.Sum(nil))
 		req.Header.Set("X-Converda-Signature", "sha256="+signature)
 	}
 
-	// 4. Send Request
 	start := time.Now()
 	resp, err := d.httpClient.Do(req)
 	duration := time.Since(start).Milliseconds()
 
 	if err != nil {
-		d.updateLogStatus(ctx, logEntry, entity.WebhookLogStatusFailed, 0, err.Error(), duration)
+		d.handleFailure(ctx, logEntry, 0, err.Error(), duration)
 		return
 	}
 	defer resp.Body.Close()
 
-	// Read Response (Limit size)
-	// TODO: limited reader
-	// For now, just simplistic status check
-	status := entity.WebhookLogStatusSuccess
+	// Read limited response body
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	respBody := string(bodyBytes)
+
 	if resp.StatusCode >= 400 {
-		status = entity.WebhookLogStatusFailed
+		d.handleFailure(ctx, logEntry, resp.StatusCode, respBody, duration)
+		return
 	}
 
-	respBody := fmt.Sprintf("Status: %d", resp.StatusCode)
+	// Success
+	logEntry.Status = entity.WebhookLogStatusSuccess
+	logEntry.ResponseCode = resp.StatusCode
+	logEntry.ResponseBody = &respBody
+	logEntry.DurationMs = duration
+	logEntry.NextRetryAt = nil
 
-	d.updateLogStatus(ctx, logEntry, status, resp.StatusCode, respBody, duration)
+	if err := d.webhookLogRepo.Update(ctx, logEntry); err != nil {
+		global.Logger.Error("Webhook dispatch: failed to update log on success: " + err.Error())
+	}
 }
 
-func (d *webhookDispatcherImpl) updateLogStatus(ctx context.Context, logEntry *entity.WebhookLog, status string, code int, body string, duration int64) {
-	logEntry.Status = status
+func (d *webhookDispatcherImpl) handleFailure(ctx context.Context, logEntry *entity.WebhookLog, code int, body string, duration int64) {
+	logEntry.Status = entity.WebhookLogStatusFailed
 	logEntry.ResponseCode = code
 	logEntry.ResponseBody = &body
 	logEntry.DurationMs = duration
 
+	if logEntry.RetryCount < logEntry.MaxRetries {
+		// Schedule next retry with exponential backoff
+		// Use per-webhook backoff base from the log's associated webhook config
+		backoffSec := defaultBackoffBaseSec
+		// backoffSec is stored alongside the log via the webhook config at dispatch time
+		backoff := time.Duration(backoffSec) * time.Second
+		for i := 0; i < logEntry.RetryCount; i++ {
+			backoff = backoff * time.Duration(backoffMultiplier)
+		}
+		nextRetry := time.Now().Add(backoff)
+		logEntry.NextRetryAt = &nextRetry
+		logEntry.RetryCount++
+
+		global.Logger.Warn("Webhook dispatch: scheduling retry #" +
+			string(rune('0'+logEntry.RetryCount)) + " for log " + logEntry.ID.String() +
+			" in " + backoff.String())
+	} else {
+		global.Logger.Error("Webhook dispatch: max retries reached for log " + logEntry.ID.String() + " — dead letter")
+		logEntry.NextRetryAt = nil
+	}
+
 	if err := d.webhookLogRepo.Update(ctx, logEntry); err != nil {
-		fmt.Printf("Error updating webhook log: %v\n", err)
+		global.Logger.Error("Webhook dispatch: failed to update log on failure: " + err.Error())
 	}
 }

@@ -36,6 +36,33 @@ type Template struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 }
 
+// TemplateContent represents a single language version of template content.
+type TemplateContent struct {
+	ID           uuid.UUID       `json:"id"`
+	TemplateID   uuid.UUID       `json:"template_id"`
+	Version      int             `json:"version"`
+	LanguageCode string          `json:"language_code"`
+	Subject      string          `json:"subject"`
+	BodyText     string          `json:"body_text"`
+	BodyHTML     string          `json:"body_html"`
+	BodyPush     json.RawMessage `json:"body_push,omitempty"`
+	CreatedAt    time.Time       `json:"created_at"`
+}
+
+func NewTemplateContent(templateID uuid.UUID, version int, langCode, subject, bodyText, bodyHTML string, bodyPush json.RawMessage) *TemplateContent {
+	return &TemplateContent{
+		ID:           uuid.New(),
+		TemplateID:   templateID,
+		Version:      version,
+		LanguageCode: langCode,
+		Subject:      subject,
+		BodyText:     bodyText,
+		BodyHTML:     bodyHTML,
+		BodyPush:     bodyPush,
+		CreatedAt:    time.Now(),
+	}
+}
+
 type ProviderConfig struct {
 	ID            uuid.UUID       `json:"id"`
 	EnvironmentID uuid.UUID       `json:"environment_id"`

@@ -9,7 +9,7 @@ import (
 )
 
 type AppService interface {
-	CreateApp(ctx context.Context, tenantID uuid.UUID, name string, description *string) (*entity.App, error)
+	CreateApp(ctx context.Context, tenantID uuid.UUID, name string, description *string, slaThreshold *int) (*entity.App, error)
 	GetApp(ctx context.Context, appID uuid.UUID) (*entity.App, error)
 	ListApps(ctx context.Context, tenantID uuid.UUID) ([]*entity.App, error)
 	UpdateApp(ctx context.Context, app *entity.App) error
@@ -17,10 +17,12 @@ type AppService interface {
 }
 
 type EnvironmentService interface {
-	CreateEnvironment(ctx context.Context, appID uuid.UUID, code string) (*entity.Environment, error)
+	CreateEnvironment(ctx context.Context, appID uuid.UUID, code string, slaThreshold *int) (*entity.Environment, error)
 	ListEnvironments(ctx context.Context, appID uuid.UUID) ([]*entity.Environment, error)
 	GetEnvironment(ctx context.Context, appID uuid.UUID, code string) (*entity.Environment, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*entity.Environment, error)
 	VerifyAPIKey(ctx context.Context, apiKey string) (*entity.Environment, error)
+	UpdateEnvironment(ctx context.Context, env *entity.Environment) error
 }
 
 type WebhookService interface {

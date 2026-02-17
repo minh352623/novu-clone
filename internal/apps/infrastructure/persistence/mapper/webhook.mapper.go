@@ -17,17 +17,20 @@ func ToWebhookEntity(m *model.WebhookModel) *entity.Webhook {
 	_ = json.Unmarshal(m.Events, &events)
 
 	return &entity.Webhook{
-		ID:            m.ID,
-		TenantID:      m.TenantID,
-		AppID:         m.AppID,
-		EnvironmentID: m.EnvironmentID,
-		URL:           m.URL,
-		Secret:        m.Secret,
-		Description:   m.Description,
-		Events:        events,
-		IsActive:      m.IsActive,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
+		ID:                  m.ID,
+		TenantID:            m.TenantID,
+		AppID:               m.AppID,
+		EnvironmentID:       m.EnvironmentID,
+		URL:                 m.URL,
+		Secret:              m.Secret,
+		Description:         m.Description,
+		Events:              events,
+		IsActive:            m.IsActive,
+		MaxRetries:          m.MaxRetries,
+		RetryBackoffSeconds: m.RetryBackoffSeconds,
+		RetryTimeoutSeconds: m.RetryTimeoutSeconds,
+		CreatedAt:           m.CreatedAt,
+		UpdatedAt:           m.UpdatedAt,
 	}
 }
 
@@ -38,17 +41,20 @@ func ToWebhookModel(e *entity.Webhook) *model.WebhookModel {
 	eventsJSON, _ := json.Marshal(e.Events)
 
 	return &model.WebhookModel{
-		ID:            e.ID,
-		TenantID:      e.TenantID,
-		AppID:         e.AppID,
-		EnvironmentID: e.EnvironmentID,
-		URL:           e.URL,
-		Secret:        e.Secret,
-		Description:   e.Description,
-		Events:        datatypes.JSON(eventsJSON),
-		IsActive:      e.IsActive,
-		CreatedAt:     e.CreatedAt,
-		UpdatedAt:     e.UpdatedAt,
+		ID:                  e.ID,
+		TenantID:            e.TenantID,
+		AppID:               e.AppID,
+		EnvironmentID:       e.EnvironmentID,
+		URL:                 e.URL,
+		Secret:              e.Secret,
+		Description:         e.Description,
+		Events:              datatypes.JSON(eventsJSON),
+		IsActive:            e.IsActive,
+		MaxRetries:          e.MaxRetries,
+		RetryBackoffSeconds: e.RetryBackoffSeconds,
+		RetryTimeoutSeconds: e.RetryTimeoutSeconds,
+		CreatedAt:           e.CreatedAt,
+		UpdatedAt:           e.UpdatedAt,
 	}
 }
 

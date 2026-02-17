@@ -2,11 +2,15 @@ package messaging
 
 import (
 	"CONVERDA/global"
+	appsRepo "CONVERDA/internal/apps/infrastructure/persistence/repository"
+	iamRepo "CONVERDA/internal/iam/infrastructure/persistence/repository"
 	"CONVERDA/internal/messaging/application/service/impl"
+	"CONVERDA/internal/messaging/application/worker"
 	"CONVERDA/internal/messaging/controller"
 	"CONVERDA/internal/messaging/controller/middleware"
 	"CONVERDA/internal/messaging/infrastructure/gateway"
 	"CONVERDA/internal/messaging/infrastructure/persistence/repository"
+	"context"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,13 +24,19 @@ func InitMessagingModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc
 	subRepo := repository.NewSubscriberRepository(db)
 	logRepo := repository.NewAssignmentLogRepository(db)
 	authRepo := repository.NewEnvironmentAuthRepository(db)
-
-	// Services
-	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo)
+	memberRepo := iamRepo.NewTenantMemberRepository(db)
+	appRepo := appsRepo.NewAppRepository(db)
+	envRepo := appsRepo.NewEnvironmentRepository(db)
 
 	// Infrastructure
 	hub := gateway.NewHub()
 	go hub.Run()
+
+	// Services
+	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberRepo, appRepo, envRepo, hub)
+
+	slaWorker := worker.NewSLAWorker(threadRepo, logRepo, appRepo, envRepo)
+	go slaWorker.Run(context.Background())
 
 	// Controllers
 	convController := controller.NewConversationController(msgService, hub)

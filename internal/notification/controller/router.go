@@ -8,12 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(r *gin.RouterGroup, svc service.NotificationService, groupMgr service.GroupManager, layoutMgr service.LayoutManager, jobScheduler service.JobScheduler) {
+func RegisterRoutes(r *gin.RouterGroup, svc service.NotificationService, groupMgr service.GroupManager, layoutMgr service.LayoutManager, jobScheduler service.JobScheduler, tmplManager *service.TemplateManager) {
 	// Notifications
 	notifController := NewNotificationController(svc)
 	groupController := NewGroupController(groupMgr)
 	layoutController := NewLayoutController(layoutMgr)
 	jobController := NewJobController(jobScheduler)
+	templateContentController := NewTemplateContentController(tmplManager)
 
 	// Group: /notifications
 	g := r.Group("/notifications")
@@ -47,6 +48,14 @@ func RegisterRoutes(r *gin.RouterGroup, svc service.NotificationService, groupMg
 			jobs.GET("", response.Wrap(jobController.ListJobs, http.StatusOK))
 			jobs.GET("/:id", response.Wrap(jobController.GetJob, http.StatusOK))
 			jobs.POST("/:id/cancel", response.Wrap(jobController.CancelJob, http.StatusOK))
+		}
+
+		// Template Content (i18n)
+		templates := g.Group("/templates")
+		{
+			templates.POST("/:id/content", response.Wrap(templateContentController.AddContent, http.StatusCreated))
+			templates.PUT("/:id/content/:lang", response.Wrap(templateContentController.UpdateContent, http.StatusOK))
+			templates.GET("/:id/languages", response.Wrap(templateContentController.ListLanguages, http.StatusOK))
 		}
 	}
 }

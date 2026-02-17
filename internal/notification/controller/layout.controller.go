@@ -74,12 +74,7 @@ func (c *LayoutController) ListLayouts(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
 	}
 
-	return map[string]interface{}{
-		"data":  dto.ToLayoutResponseList(layouts),
-		"page":  page,
-		"limit": limit,
-		"total": total,
-	}, nil
+	return dto.NewPaginatedResponse(dto.ToLayoutResponseList(layouts), page, limit, total), nil
 }
 
 // GetLayout godoc

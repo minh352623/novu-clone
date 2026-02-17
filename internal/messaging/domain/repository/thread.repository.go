@@ -14,6 +14,7 @@ type ThreadFilter struct {
 	AssignedToMe  bool
 	MemberID      *uuid.UUID
 	EnvironmentID *uuid.UUID
+	IsOverdue     *bool
 	Limit         int
 	Offset        int
 }
@@ -35,4 +36,6 @@ type ThreadRepository interface {
 
 	// Direct Chat Specific
 	GetDirectThreadBetweenEntities(ctx context.Context, typeA string, idA uuid.UUID, typeB string, idB uuid.UUID) (*entity.Thread, error)
+
+	MarkAsOverdue(ctx context.Context, id uuid.UUID) error
 }

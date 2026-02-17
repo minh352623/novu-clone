@@ -134,8 +134,7 @@ CREATE TABLE notification_logs (
 -- Notification Tracking (Opens/Clicks)
 CREATE TABLE notification_trackings (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
-    notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
-    tracking_token TEXT UNIQUE NOT NULL,
+    notification_id UUID NOT NULL REFERENCES notification_logs(id) ON DELETE CASCADE,
     tracking_token TEXT UNIQUE NOT NULL,
     
     opened_at TIMESTAMP WITH TIME ZONE,

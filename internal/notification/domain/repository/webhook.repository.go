@@ -14,5 +14,6 @@ type WebhookRepository interface {
 
 type WebhookLogRepository interface {
 	Create(ctx context.Context, log *entity.WebhookLog) error
-	Update(ctx context.Context, log *entity.WebhookLog) error // To update status/response
+	Update(ctx context.Context, log *entity.WebhookLog) error
+	GetPendingRetries(ctx context.Context, limit int) ([]*entity.WebhookLog, error)
 }

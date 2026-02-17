@@ -8,17 +8,20 @@ import (
 )
 
 type WebhookModel struct {
-	ID            uuid.UUID      `gorm:"type:uuid;primaryKey;default:generate_uuid_v7()"`
-	TenantID      uuid.UUID      `gorm:"type:uuid;not null"`
-	AppID         uuid.UUID      `gorm:"type:uuid;not null"`
-	EnvironmentID uuid.UUID      `gorm:"type:uuid;not null"`
-	URL           string         `gorm:"not null"`
-	Secret        string         `gorm:"not null"`
-	Description   *string        `gorm:"type:text"`
-	Events        datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'"`
-	IsActive      bool           `gorm:"default:true"`
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID                  uuid.UUID      `gorm:"type:uuid;primaryKey;default:generate_uuid_v7()"`
+	TenantID            uuid.UUID      `gorm:"type:uuid;not null"`
+	AppID               uuid.UUID      `gorm:"type:uuid;not null"`
+	EnvironmentID       uuid.UUID      `gorm:"type:uuid;not null"`
+	URL                 string         `gorm:"not null"`
+	Secret              string         `gorm:"not null"`
+	Description         *string        `gorm:"type:text"`
+	Events              datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'"`
+	IsActive            bool           `gorm:"default:true"`
+	MaxRetries          int            `gorm:"column:max_retries;default:3"`
+	RetryBackoffSeconds int            `gorm:"column:retry_backoff_seconds;default:5"`
+	RetryTimeoutSeconds int            `gorm:"column:retry_timeout_seconds;default:10"`
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 func (WebhookModel) TableName() string {
@@ -34,9 +37,12 @@ type WebhookLogModel struct {
 	ResponseCode   int
 	ResponseBody   *string `gorm:"type:text"`
 	DurationMs     int64
-	Status         string    `gorm:"not null"`
-	TenantID       uuid.UUID `gorm:"type:uuid;not null"`
-	AppID          uuid.UUID `gorm:"type:uuid;not null"`
+	Status         string     `gorm:"not null"`
+	RetryCount     int        `gorm:"not null;default:0"`
+	MaxRetries     int        `gorm:"not null;default:3"`
+	NextRetryAt    *time.Time `gorm:"type:timestamptz"`
+	TenantID       uuid.UUID  `gorm:"type:uuid;not null"`
+	AppID          uuid.UUID  `gorm:"type:uuid;not null"`
 	CreatedAt      time.Time
 }
 

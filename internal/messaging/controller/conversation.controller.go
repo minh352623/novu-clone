@@ -635,6 +635,34 @@ func (c *ConversationController) ResolveThread(ctx *gin.Context) (interface{}, e
 	return map[string]string{"status": "resolved"}, nil
 }
 
+// GetThreadAuditTrail godoc
+// @Summary Get Conversation Audit Trail
+// @Description Fetch history of assignments and resolutions
+// @Tags Messaging
+// @Produce json
+// @Param id path string true "Thread ID"
+// @Success 200 {object} dto.AuditTrailResponse
+// @Security BearerAuth
+// @Router /conversations/{id}/audit-trail [get]
+func (c *ConversationController) GetThreadAuditTrail(ctx *gin.Context) (interface{}, error) {
+	threadID, err := uuid.Parse(ctx.Param("id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+	}
+
+	envID := uuid.Nil
+	if eID, ok := ctx.Get("environment_id"); ok {
+		envID = eID.(uuid.UUID)
+	}
+
+	trail, err := c.svc.GetThreadAuditTrail(ctx.Request.Context(), envID, threadID)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return trail, nil
+}
+
 // GetTeamStats godoc
 // @Summary Get Team Analytics
 // @Description Get messaging performance metrics for the team
@@ -764,7 +792,62 @@ func (c *ConversationController) ServeWS(ctx *gin.Context) {
 		return
 	}
 
-	gateway.ServeWs(c.Hub, ctx, userID)
+	envID := uuid.Nil
+	if eID, ok := ctx.Get("environment_id"); ok {
+		envID = eID.(uuid.UUID)
+	}
+
+	gateway.ServeWs(c.Hub, ctx, userID, envID)
+}
+
+// GetPersonalDashboard godoc
+// @Summary Get Personal Dashboard
+// @Description Get comprehensive metrics and activity for the current agent
+// @Tags Analytics
+// @Produce json
+// @Param environment_id query string true "Environment ID"
+// @Param from query string false "From Date (YYYY-MM-DD)"
+// @Param to query string false "To Date (YYYY-MM-DD)"
+// @Param sla_threshold query int false "SLA Threshold override (seconds)"
+// @Success 200 {object} dto.PersonalDashboardResponse
+// @Security BearerAuth
+// @Router /dashboards/personal [get]
+func (c *ConversationController) GetPersonalDashboard(ctx *gin.Context) (interface{}, error) {
+	// Parse Environment ID
+	envID, err := uuid.Parse(ctx.Query("environment_id"))
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Environment ID", err)
+	}
+
+	// Parse Dates
+	now := time.Now()
+	fromStr := ctx.DefaultQuery("from", now.AddDate(0, 0, -1).Format("2006-01-02")) // Default to last 24h
+	toStr := ctx.DefaultQuery("to", now.Format("2006-01-02"))
+
+	from, _ := time.Parse("2006-01-02", fromStr)
+	to, _ := time.Parse("2006-01-02", toStr)
+	to = to.Add(24 * time.Hour).Add(-1 * time.Second)
+
+	sla, _ := strconv.Atoi(ctx.Query("sla_threshold"))
+
+	agentID := uuid.Nil
+	if uID, ok := ctx.Get("user_id"); ok {
+		agentID = uID.(uuid.UUID)
+	}
+
+	req := dto.DashboardStatsRequest{
+		EnvironmentID: envID,
+		From:          from,
+		To:            to,
+		SLAThreshold:  sla,
+	}
+
+	dashboard, err := c.svc.GetPersonalDashboard(ctx.Request.Context(), agentID, req)
+	if err != nil {
+		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+	}
+
+	return dashboard, nil
 }
 
 func (c *ConversationController) broadcastMessage(ctx context.Context, msg *entity.Message) {

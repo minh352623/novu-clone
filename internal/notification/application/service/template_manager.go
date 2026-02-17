@@ -105,3 +105,66 @@ func (tm *TemplateManager) compileString(tmplStr string, data map[string]interfa
 
 	return buf.String(), nil
 }
+
+// --- Content Management (i18n) ---
+
+func (tm *TemplateManager) AddContent(ctx context.Context, templateID uuid.UUID, content *entity.TemplateContent) error {
+	// Verify template exists
+	tmpl, err := tm.repo.GetByID(ctx, templateID)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+	if tmpl == nil {
+		return fmt.Errorf("template not found")
+	}
+
+	content.TemplateID = templateID
+	content.Version = tmpl.Version
+	return tm.repo.CreateContent(ctx, content)
+}
+
+func (tm *TemplateManager) UpdateContent(ctx context.Context, templateID uuid.UUID, lang string, content *entity.TemplateContent) error {
+	tmpl, err := tm.repo.GetByID(ctx, templateID)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+	if tmpl == nil {
+		return fmt.Errorf("template not found")
+	}
+
+	existing, err := tm.repo.GetContent(ctx, templateID, tmpl.Version, lang)
+	if err != nil {
+		return fmt.Errorf("failed to get content: %w", err)
+	}
+	if existing == nil {
+		return fmt.Errorf("content for language '%s' not found", lang)
+	}
+
+	// Apply partial updates
+	if content.Subject != "" {
+		existing.Subject = content.Subject
+	}
+	if content.BodyText != "" {
+		existing.BodyText = content.BodyText
+	}
+	if content.BodyHTML != "" {
+		existing.BodyHTML = content.BodyHTML
+	}
+	if content.BodyPush != nil {
+		existing.BodyPush = content.BodyPush
+	}
+
+	return tm.repo.UpdateContent(ctx, existing)
+}
+
+func (tm *TemplateManager) ListLanguages(ctx context.Context, templateID uuid.UUID) ([]string, error) {
+	tmpl, err := tm.repo.GetByID(ctx, templateID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get template: %w", err)
+	}
+	if tmpl == nil {
+		return nil, fmt.Errorf("template not found")
+	}
+
+	return tm.repo.ListLanguages(ctx, templateID, tmpl.Version)
+}

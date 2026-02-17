@@ -1142,6 +1142,16 @@
                 }
             }
         },
+        "/conversations/ws": {
+            "get": {
+                "description": "Connect to WebSocket for real-time updates",
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "WebSocket Connection",
+                "responses": {}
+            }
+        },
         "/conversations/{id}": {
             "get": {
                 "description": "List messages in a conversation",
@@ -1159,16 +1169,32 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination Cursor (Base64)",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Direction: 'before' (older) or 'after' (newer)",
+                        "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit (default 20)",
+                        "name": "limit",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.MessageResponse"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -1401,6 +1427,169 @@
                 }
             }
         },
+        "/dashboards/agent/{member_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get comprehensive agent performance metrics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboards"
+                ],
+                "summary": "Get Agent Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Member ID",
+                        "name": "member_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Time (RFC3339)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Time (RFC3339)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "SLA Threshold in seconds",
+                        "name": "sla_threshold",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.AgentDashboardResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboards/partner": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get comprehensive partner performance metrics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboards"
+                ],
+                "summary": "Get Partner Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Time (RFC3339)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Time (RFC3339)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "SLA Threshold in seconds",
+                        "name": "sla_threshold",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.PartnerDashboardResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboards/team": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get comprehensive team performance metrics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboards"
+                ],
+                "summary": "Get Team Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Time (RFC3339)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Time (RFC3339)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "SLA Threshold in seconds",
+                        "name": "sla_threshold",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.TeamDashboardResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/environments/{id}/api-keys": {
             "get": {
                 "security": [
@@ -1546,6 +1735,405 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/groups": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List notification groups",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "List Notification Groups",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.PaginatedResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new notification group (category)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Create Notification Group",
+                "parameters": [
+                    {
+                        "description": "Group Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.CreateGroupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.GroupResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/groups/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a notification group by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Get Notification Group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.GroupResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a notification group",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Delete Notification Group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a notification group",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Update Notification Group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Group Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.UpdateGroupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/notifications/layouts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List notification layouts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "List Notification Layouts",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.PaginatedResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new notification layout",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Create Notification Layout",
+                "parameters": [
+                    {
+                        "description": "Layout Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.CreateLayoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.LayoutResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/layouts/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a notification layout by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Get Notification Layout",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Layout ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.LayoutResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a notification layout",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Delete Notification Layout",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Layout ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a notification layout",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Update Notification Layout",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Layout ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Layout Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.UpdateLayoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/notifications/send": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Send a notification via configured channel",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Send Notification",
+                "parameters": [
+                    {
+                        "description": "Notification Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.SendNotificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.NotificationResponse"
                         }
                     }
                 }
@@ -4028,6 +4616,14 @@
                 }
             }
         },
+        "CONVERDA_internal_messaging_controller_dto.AgentDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "stats": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.AgentStats"
+                }
+            }
+        },
         "CONVERDA_internal_messaging_controller_dto.AgentStatsResponse": {
             "type": "object",
             "properties": {
@@ -4113,6 +4709,10 @@
                 "subscriber_key"
             ],
             "properties": {
+                "channel": {
+                    "description": "Optional, default \"api\" or \"web\"",
+                    "type": "string"
+                },
                 "content": {
                     "type": "object"
                 },
@@ -4214,6 +4814,19 @@
                 }
             }
         },
+        "CONVERDA_internal_messaging_controller_dto.PartnerDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "stats": {
+                    "description": "Partner dashboard uses TeamStats for now",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats"
+                        }
+                    ]
+                }
+            }
+        },
         "CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest": {
             "type": "object",
             "required": [
@@ -4222,6 +4835,14 @@
             "properties": {
                 "content": {
                     "type": "object"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.TeamDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "stats": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats"
                 }
             }
         },
@@ -4245,6 +4866,9 @@
         "CONVERDA_internal_messaging_controller_dto.ThreadResponse": {
             "type": "object",
             "properties": {
+                "channel": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -4285,6 +4909,260 @@
             "properties": {
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_domain_model_entity.AgentStats": {
+            "type": "object",
+            "properties": {
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "current_open_threads": {
+                    "type": "integer"
+                },
+                "member_id": {
+                    "type": "string"
+                },
+                "response_time_distribution": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.ResponseTimeDistribution"
+                },
+                "total_assigned": {
+                    "type": "integer"
+                },
+                "total_resolved": {
+                    "type": "integer"
+                },
+                "workload": {
+                    "description": "Same as CurrentOpenThreads for now",
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_domain_model_entity.ResponseTimeDistribution": {
+            "type": "object",
+            "properties": {
+                "from_5_to_15m": {
+                    "type": "integer"
+                },
+                "over_15m": {
+                    "type": "integer"
+                },
+                "under_5m": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_domain_model_entity.TeamStats": {
+            "type": "object",
+            "properties": {
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "resolved_count": {
+                    "type": "integer"
+                },
+                "response_time_distribution": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.ResponseTimeDistribution"
+                },
+                "sla_compliance_rate": {
+                    "type": "number"
+                },
+                "total_conversations": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.CreateGroupRequest": {
+            "type": "object",
+            "required": [
+                "key",
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.CreateLayoutRequest": {
+            "type": "object",
+            "required": [
+                "content_html",
+                "name"
+            ],
+            "properties": {
+                "content_html": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "variables_schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.GroupResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.LayoutResponse": {
+            "type": "object",
+            "properties": {
+                "content_html": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "variables_schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.NotificationResponse": {
+            "type": "object",
+            "properties": {
+                "notification_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.PaginatedResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.SendNotificationRequest": {
+            "type": "object",
+            "required": [
+                "channel",
+                "recipient",
+                "template_code"
+            ],
+            "properties": {
+                "channel": {
+                    "type": "string",
+                    "enum": [
+                        "email",
+                        "sms",
+                        "push"
+                    ]
+                },
+                "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "language": {
+                    "description": "Optional, default 'en'",
+                    "type": "string"
+                },
+                "recipient": {
+                    "description": "Validate email format",
+                    "type": "string"
+                },
+                "template_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.UpdateGroupRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.UpdateLayoutRequest": {
+            "type": "object",
+            "properties": {
+                "content_html": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "variables_schema": {
+                    "type": "object",
+                    "additionalProperties": true
                 }
             }
         },
