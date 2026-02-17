@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"CONVERDA/global"
-	appsRepo "CONVERDA/internal/apps/domain/repository"
 	"CONVERDA/internal/messaging/domain/model/entity"
 	domainRepo "CONVERDA/internal/messaging/domain/repository"
 
@@ -20,22 +19,19 @@ const (
 type SLAWorker struct {
 	threadRepo domainRepo.ThreadRepository
 	logRepo    domainRepo.AssignmentLogRepository
-	appRepo    appsRepo.AppRepository
-	envRepo    appsRepo.EnvironmentRepository
+	appReader  domainRepo.AppReader
 	interval   time.Duration
 }
 
 func NewSLAWorker(
 	threadRepo domainRepo.ThreadRepository,
 	logRepo domainRepo.AssignmentLogRepository,
-	appRepo appsRepo.AppRepository,
-	envRepo appsRepo.EnvironmentRepository,
+	appReader domainRepo.AppReader,
 ) *SLAWorker {
 	return &SLAWorker{
 		threadRepo: threadRepo,
 		logRepo:    logRepo,
-		appRepo:    appRepo,
-		envRepo:    envRepo,
+		appReader:  appReader,
 		interval:   1 * time.Minute,
 	}
 }
@@ -106,9 +102,9 @@ func (w *SLAWorker) isThreadOverdue(ctx context.Context, t *entity.Thread) bool 
 	threshold := w.getSLAThreshold(ctx, t.EnvironmentID)
 
 	var startTime time.Time
-	if t.Status == "unassigned" {
+	if t.Status == entity.ThreadStatusUnassigned {
 		startTime = t.CreatedAt
-	} else if t.Status == "assigned" {
+	} else if t.Status == entity.ThreadStatusAssigned {
 		// Find last assignment time from logs to calculate response time
 		log, err := w.logRepo.GetLastByThread(ctx, t.ID)
 		if err == nil && log != nil {
@@ -128,12 +124,12 @@ func (w *SLAWorker) getSLAThreshold(ctx context.Context, envID uuid.UUID) int {
 		return defaultSLAThreshold
 	}
 
-	env, err := w.envRepo.GetByID(ctx, envID)
+	env, err := w.appReader.GetEnvironment(ctx, envID)
 	if err == nil && env != nil {
 		if env.SLAThresholdSeconds > 0 {
 			return env.SLAThresholdSeconds
 		}
-		app, err := w.appRepo.GetByID(ctx, env.AppID)
+		app, err := w.appReader.GetApp(ctx, env.AppID)
 		if err == nil && app != nil && app.SLAThresholdSeconds > 0 {
 			return app.SLAThresholdSeconds
 		}

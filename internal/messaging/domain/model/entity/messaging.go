@@ -1,7 +1,9 @@
 package entity
 
 import (
+	"CONVERDA/internal/messaging/domain"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,12 +20,44 @@ type Subscriber struct {
 	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
+// ThreadStatus represents the lifecycle state of a conversation thread.
+type ThreadStatus string
+
+const (
+	ThreadStatusUnassigned ThreadStatus = "unassigned"
+	ThreadStatusAssigned   ThreadStatus = "assigned"
+	ThreadStatusResolved   ThreadStatus = "resolved"
+)
+
+// validTransitions defines the allowed status changes.
+var validTransitions = map[ThreadStatus][]ThreadStatus{
+	ThreadStatusUnassigned: {ThreadStatusAssigned},
+	ThreadStatusAssigned:   {ThreadStatusUnassigned, ThreadStatusResolved},
+	ThreadStatusResolved:   {ThreadStatusUnassigned}, // reopen → unassigned
+}
+
+// TransitionTo validates and applies a status change.
+func (t *Thread) TransitionTo(target ThreadStatus) error {
+	allowed, ok := validTransitions[t.Status]
+	if !ok {
+		return fmt.Errorf("%w: unknown current status %q", domain.ErrInvalidStatusTransition, t.Status)
+	}
+	for _, s := range allowed {
+		if s == target {
+			t.Status = target
+			t.UpdatedAt = time.Now()
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s → %s", domain.ErrInvalidStatusTransition, t.Status, target)
+}
+
 type Thread struct {
 	ID            uuid.UUID       `json:"id"`
 	EnvironmentID uuid.UUID       `json:"environment_id"`
 	Type          string          `json:"type"`    // direct, group, support
 	Channel       string          `json:"channel"` // zalo, facebook, web
-	Status        string          `json:"status"`  // unassigned, assigned, resolved
+	Status        ThreadStatus    `json:"status"`  // unassigned, assigned, resolved
 	Metadata      json.RawMessage `json:"metadata"`
 	ReferenceHash *string         `json:"reference_hash,omitempty"`
 	CreatedAt     time.Time       `json:"created_at"`
@@ -97,7 +131,7 @@ func NewThread(envID uuid.UUID, threadType, channel string) *Thread {
 		EnvironmentID: envID,
 		Type:          threadType,
 		Channel:       channel,
-		Status:        "unassigned",
+		Status:        ThreadStatusUnassigned,
 		Metadata:      json.RawMessage("{}"),
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),

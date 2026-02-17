@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"CONVERDA/global"
-	appsEntity "CONVERDA/internal/apps/domain/model/entity"
 	"CONVERDA/internal/messaging/application/worker"
 	"CONVERDA/internal/messaging/domain/model/entity"
+	"CONVERDA/internal/messaging/domain/repository"
 	domainRepo "CONVERDA/internal/messaging/domain/repository"
 	"CONVERDA/pkg/logger"
 	"CONVERDA/pkg/setting"
@@ -130,78 +130,29 @@ func (m *MockAssignmentLogRepository) GetByThread(ctx context.Context, threadID 
 	return args.Get(0).([]*entity.AssignmentLog), args.Error(1)
 }
 
-type MockAppRepository struct {
+func (m *MockAssignmentLogRepository) ListByThread(ctx context.Context, filter repository.AuditTrailFilter) ([]*entity.AssignmentLog, int64, error) {
+	args := m.Called(ctx, filter)
+	return args.Get(0).([]*entity.AssignmentLog), args.Get(1).(int64), args.Error(2)
+}
+
+type MockAppReader struct {
 	mock.Mock
 }
 
-func (m *MockAppRepository) Create(ctx context.Context, app *appsEntity.App) (*appsEntity.App, error) {
-	args := m.Called(ctx, app)
-	return args.Get(0).(*appsEntity.App), args.Error(1)
-}
-
-func (m *MockAppRepository) GetByID(ctx context.Context, id uuid.UUID) (*appsEntity.App, error) {
+func (m *MockAppReader) GetApp(ctx context.Context, id uuid.UUID) (*repository.AppInfo, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*appsEntity.App), args.Error(1)
+	return args.Get(0).(*repository.AppInfo), args.Error(1)
 }
 
-func (m *MockAppRepository) Update(ctx context.Context, app *appsEntity.App) error {
-	args := m.Called(ctx, app)
-	return args.Error(0)
-}
-
-func (m *MockAppRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *MockAppRepository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]*appsEntity.App, error) {
-	args := m.Called(ctx, tenantID)
-	return args.Get(0).([]*appsEntity.App), args.Error(1)
-}
-
-type MockEnvironmentRepository struct {
-	mock.Mock
-}
-
-func (m *MockEnvironmentRepository) Create(ctx context.Context, env *appsEntity.Environment) (*appsEntity.Environment, error) {
-	args := m.Called(ctx, env)
-	return args.Get(0).(*appsEntity.Environment), args.Error(1)
-}
-
-func (m *MockEnvironmentRepository) GetByID(ctx context.Context, id uuid.UUID) (*appsEntity.Environment, error) {
+func (m *MockAppReader) GetEnvironment(ctx context.Context, id uuid.UUID) (*repository.EnvInfo, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*appsEntity.Environment), args.Error(1)
-}
-
-func (m *MockEnvironmentRepository) GetByAppAndCode(ctx context.Context, appID uuid.UUID, code string) (*appsEntity.Environment, error) {
-	args := m.Called(ctx, appID, code)
-	return args.Get(0).(*appsEntity.Environment), args.Error(1)
-}
-
-func (m *MockEnvironmentRepository) ListByApp(ctx context.Context, appID uuid.UUID) ([]*appsEntity.Environment, error) {
-	args := m.Called(ctx, appID)
-	return args.Get(0).([]*appsEntity.Environment), args.Error(1)
-}
-
-func (m *MockEnvironmentRepository) GetByAPIKey(ctx context.Context, apiKey string) (*appsEntity.Environment, error) {
-	args := m.Called(ctx, apiKey)
-	return args.Get(0).(*appsEntity.Environment), args.Error(1)
-}
-
-func (m *MockEnvironmentRepository) Update(ctx context.Context, env *appsEntity.Environment) error {
-	args := m.Called(ctx, env)
-	return args.Error(0)
-}
-
-func (m *MockEnvironmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
+	return args.Get(0).(*repository.EnvInfo), args.Error(1)
 }
 
 // --- Helper ---
@@ -212,8 +163,8 @@ func setupLogger() {
 	})
 }
 
-func newSLAWorker(threadRepo *MockThreadRepository, logRepo *MockAssignmentLogRepository, appRepo *MockAppRepository, envRepo *MockEnvironmentRepository) *worker.SLAWorker {
-	return worker.NewSLAWorker(threadRepo, logRepo, appRepo, envRepo)
+func newSLAWorker(threadRepo *MockThreadRepository, logRepo *MockAssignmentLogRepository, appReader *MockAppReader) *worker.SLAWorker {
+	return worker.NewSLAWorker(threadRepo, logRepo, appReader)
 }
 
 // Matcher for ThreadFilter by status
@@ -232,14 +183,13 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		envID := uuid.New()
 		threadID := uuid.New()
 
-		mockEnvRepo.On("GetByID", ctx, envID).Return(&appsEntity.Environment{
+		mockAppReader.On("GetEnvironment", ctx, envID).Return(&repository.EnvInfo{
 			ID:                  envID,
 			SLAThresholdSeconds: 10,
 		}, nil).Once()
@@ -247,7 +197,7 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		thread := &entity.Thread{
 			ID:            threadID,
 			EnvironmentID: envID,
-			Status:        "unassigned",
+			Status:        entity.ThreadStatusUnassigned,
 			CreatedAt:     time.Now().Add(-15 * time.Second),
 			IsOverdue:     false,
 		}
@@ -259,22 +209,21 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		w.Exported_checkSLA(ctx)
 
 		mockThreadRepo.AssertExpectations(t)
-		mockEnvRepo.AssertExpectations(t)
+		mockAppReader.AssertExpectations(t)
 	})
 
 	t.Run("should mark assigned thread as overdue based on assignment time", func(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		envID := uuid.New()
 		threadID := uuid.New()
 		memberID := uuid.New()
 
-		mockEnvRepo.On("GetByID", ctx, envID).Return(&appsEntity.Environment{
+		mockAppReader.On("GetEnvironment", ctx, envID).Return(&repository.EnvInfo{
 			ID:                  envID,
 			SLAThresholdSeconds: 10,
 		}, nil).Once()
@@ -282,7 +231,7 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		thread := &entity.Thread{
 			ID:            threadID,
 			EnvironmentID: envID,
-			Status:        "assigned",
+			Status:        entity.ThreadStatusAssigned,
 			CreatedAt:     time.Now().Add(-1 * time.Hour),
 			IsOverdue:     false,
 		}
@@ -299,7 +248,7 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		w.Exported_checkSLA(ctx)
 
 		mockThreadRepo.AssertExpectations(t)
-		mockEnvRepo.AssertExpectations(t)
+		mockAppReader.AssertExpectations(t)
 		mockLogRepo.AssertExpectations(t)
 	})
 
@@ -307,14 +256,13 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		envID := uuid.New()
 
 		// SLA = 60s, thread created 5s ago — NOT overdue
-		mockEnvRepo.On("GetByID", ctx, envID).Return(&appsEntity.Environment{
+		mockAppReader.On("GetEnvironment", ctx, envID).Return(&repository.EnvInfo{
 			ID:                  envID,
 			SLAThresholdSeconds: 60,
 		}, nil).Once()
@@ -322,7 +270,7 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		thread := &entity.Thread{
 			ID:            uuid.New(),
 			EnvironmentID: envID,
-			Status:        "unassigned",
+			Status:        entity.ThreadStatusUnassigned,
 			CreatedAt:     time.Now().Add(-5 * time.Second),
 			IsOverdue:     false,
 		}
@@ -341,20 +289,19 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		envID := uuid.New()
 
 		// Env lookup fails → default 900s
-		mockEnvRepo.On("GetByID", ctx, envID).Return(nil, errors.New("not found")).Once()
+		mockAppReader.On("GetEnvironment", ctx, envID).Return(nil, errors.New("not found")).Once()
 
 		// Thread created 5 seconds ago — well under 900s default
 		thread := &entity.Thread{
 			ID:            uuid.New(),
 			EnvironmentID: envID,
-			Status:        "unassigned",
+			Status:        entity.ThreadStatusUnassigned,
 			CreatedAt:     time.Now().Add(-5 * time.Second),
 			IsOverdue:     false,
 		}
@@ -371,21 +318,20 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		envID := uuid.New()
 		appID := uuid.New()
 		threadID := uuid.New()
 
 		// Env SLA = 0, App SLA = 10
-		mockEnvRepo.On("GetByID", ctx, envID).Return(&appsEntity.Environment{
+		mockAppReader.On("GetEnvironment", ctx, envID).Return(&repository.EnvInfo{
 			ID:                  envID,
 			AppID:               appID,
 			SLAThresholdSeconds: 0, // No env-level SLA
 		}, nil).Once()
-		mockAppRepo.On("GetByID", ctx, appID).Return(&appsEntity.App{
+		mockAppReader.On("GetApp", ctx, appID).Return(&repository.AppInfo{
 			ID:                  appID,
 			SLAThresholdSeconds: 10, // App-level SLA = 10s
 		}, nil).Once()
@@ -394,7 +340,7 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		thread := &entity.Thread{
 			ID:            threadID,
 			EnvironmentID: envID,
-			Status:        "unassigned",
+			Status:        entity.ThreadStatusUnassigned,
 			CreatedAt:     time.Now().Add(-15 * time.Second),
 			IsOverdue:     false,
 		}
@@ -406,16 +352,15 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		w.Exported_checkSLA(ctx)
 
 		mockThreadRepo.AssertExpectations(t)
-		mockAppRepo.AssertExpectations(t)
+		mockAppReader.AssertExpectations(t)
 	})
 
 	t.Run("should handle empty thread list without panic", func(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		mockThreadRepo.On("List", ctx, statusMatcher("unassigned")).Return([]*entity.Thread{}, int64(0), nil).Once()
 		mockThreadRepo.On("List", ctx, statusMatcher("assigned")).Return([]*entity.Thread{}, int64(0), nil).Once()
@@ -431,9 +376,8 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		mockThreadRepo.On("List", ctx, statusMatcher("unassigned")).Return([]*entity.Thread{}, int64(0), errors.New("db error")).Once()
 		mockThreadRepo.On("List", ctx, statusMatcher("assigned")).Return([]*entity.Thread{}, int64(0), nil).Once()
@@ -449,15 +393,14 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 		ctx := context.Background()
 		mockThreadRepo := new(MockThreadRepository)
 		mockLogRepo := new(MockAssignmentLogRepository)
-		mockAppRepo := new(MockAppRepository)
-		mockEnvRepo := new(MockEnvironmentRepository)
-		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppRepo, mockEnvRepo)
+		mockAppReader := new(MockAppReader)
+		w := newSLAWorker(mockThreadRepo, mockLogRepo, mockAppReader)
 
 		// Thread with nil envID, created 5s ago — under 900s default
 		thread := &entity.Thread{
 			ID:            uuid.New(),
 			EnvironmentID: uuid.Nil,
-			Status:        "unassigned",
+			Status:        entity.ThreadStatusUnassigned,
 			CreatedAt:     time.Now().Add(-5 * time.Second),
 			IsOverdue:     false,
 		}
@@ -469,7 +412,7 @@ func TestSLAWorker_CheckSLA(t *testing.T) {
 
 		// Default is 900s, thread is 5s old → NOT overdue
 		mockThreadRepo.AssertNotCalled(t, "MarkAsOverdue", mock.Anything, mock.Anything)
-		// envRepo should NOT be called for uuid.Nil
-		mockEnvRepo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything)
+		// appReader should NOT be called for uuid.Nil
+		mockAppReader.AssertNotCalled(t, "GetEnvironment", mock.Anything, mock.Anything)
 	})
 }

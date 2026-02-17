@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/domain/model/entity"
 	"CONVERDA/internal/iam/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // tenantServiceImpl implements TenantService
@@ -36,7 +38,10 @@ func NewTenantService(
 
 func (s *tenantServiceImpl) CreateTenant(ctx context.Context, name, slug string, ownerUserID uuid.UUID) (*entity.Tenant, error) {
 	// Check if slug exists
-	existing, _ := s.tenantRepo.GetBySlug(ctx, slug)
+	existing, err := s.tenantRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing tenant slug: %w", err)
+	}
 	if existing != nil {
 		return nil, service.ErrTenantSlugExists
 	}
@@ -65,8 +70,7 @@ func (s *tenantServiceImpl) CreateTenant(ctx context.Context, name, slug string,
 	if err == nil && adminRole != nil {
 		roleID = &adminRole.ID
 	} else {
-		// Log error - this should not happen if migration 00016 ran
-		fmt.Printf("Warning: Default admin role %s not found in database. Tenant owner will have no role.\n", entity.RoleTenantAdmin)
+		global.Logger.Warn("CreateTenant: default admin role not found in database", zap.String("roleSlug", string(entity.RoleTenantAdmin)))
 	}
 
 	// Add owner as admin member
@@ -121,13 +125,23 @@ func (s *tenantServiceImpl) UpdateTenant(ctx context.Context, tenant *entity.Ten
 	if err := tenant.Validate(); err != nil {
 		return err
 	}
-	return s.tenantRepo.Update(ctx, tenant)
+	if err := s.tenantRepo.Update(ctx, tenant); err != nil {
+		return fmt.Errorf("failed to update tenant %s: %w", tenant.ID, err)
+	}
+	return nil
 }
 
 func (s *tenantServiceImpl) DeleteTenant(ctx context.Context, id uuid.UUID) error {
-	return s.tenantRepo.Delete(ctx, id)
+	if err := s.tenantRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete tenant %s: %w", id, err)
+	}
+	return nil
 }
 
 func (s *tenantServiceImpl) GetUserTenants(ctx context.Context, userID uuid.UUID) ([]*entity.Tenant, error) {
-	return s.tenantRepo.GetByUserID(ctx, userID)
+	tenants, err := s.tenantRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tenants for user %s: %w", userID, err)
+	}
+	return tenants, nil
 }

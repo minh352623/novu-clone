@@ -637,10 +637,14 @@ func (c *ConversationController) ResolveThread(ctx *gin.Context) (interface{}, e
 
 // GetThreadAuditTrail godoc
 // @Summary Get Conversation Audit Trail
-// @Description Fetch history of assignments and resolutions
+// @Description Fetch paginated history of assignments and resolutions
 // @Tags Messaging
 // @Produce json
 // @Param id path string true "Thread ID"
+// @Param page query int false "Page number (default 1)"
+// @Param page_size query int false "Items per page (default 20, max 100)"
+// @Param from query string false "Filter from date (RFC3339)"
+// @Param to query string false "Filter to date (RFC3339)"
 // @Success 200 {object} dto.AuditTrailResponse
 // @Security BearerAuth
 // @Router /conversations/{id}/audit-trail [get]
@@ -655,7 +659,37 @@ func (c *ConversationController) GetThreadAuditTrail(ctx *gin.Context) (interfac
 		envID = eID.(uuid.UUID)
 	}
 
-	trail, err := c.svc.GetThreadAuditTrail(ctx.Request.Context(), envID, threadID)
+	// Pagination defaults
+	page := 1
+	pageSize := 20
+	if p := ctx.Query("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	if ps := ctx.Query("page_size"); ps != "" {
+		if v, err := strconv.Atoi(ps); err == nil && v > 0 {
+			pageSize = v
+			if pageSize > 100 {
+				pageSize = 100
+			}
+		}
+	}
+
+	// Optional date-range filter
+	var from, to *time.Time
+	if f := ctx.Query("from"); f != "" {
+		if t, err := time.Parse(time.RFC3339, f); err == nil {
+			from = &t
+		}
+	}
+	if t := ctx.Query("to"); t != "" {
+		if parsed, err := time.Parse(time.RFC3339, t); err == nil {
+			to = &parsed
+		}
+	}
+
+	trail, err := c.svc.GetThreadAuditTrail(ctx.Request.Context(), envID, threadID, page, pageSize, from, to)
 	if err != nil {
 		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
 	}
@@ -755,39 +789,17 @@ func (c *ConversationController) GetMyStats(ctx *gin.Context) (interface{}, erro
 
 // ServeWS godoc
 // @Summary WebSocket Connection
-// @Description Connect to WebSocket for real-time updates
+// @Description Connect to WebSocket for real-time messaging updates (requires auth)
 // @Tags Messaging
 // @Router /conversations/ws [get]
 func (c *ConversationController) ServeWS(ctx *gin.Context) {
-	// 1. Get User from Context (Auth Middleware should have set this) or Query Param for WS
-	// Since standard JS WebSocket can't send headers, we might need to rely on Query Param `token`
-	// and manually validate it, OR rely on Cookie.
-	// For now, assuming EnvKeyAuth or Bearer passes.
-	// BUT: The router usually protects this.
-	// If connecting from browser with `new WebSocket(url?token=...)`, we need to handle auth here if middleware fails.
-	// For simplicity, let's assume the router uses a middleware that checks Query Param too.
-
+	// Auth middleware sets user_id in context (JWT bearer or query token)
 	userID := uuid.Nil
 	if uID, ok := ctx.Get("user_id"); ok {
 		userID = uID.(uuid.UUID)
-	} else {
-		// Try to see if it's an environment/service token (less likely for user chat)
-		// For now, require user_id (Agent)
-		// If connecting as End-User (widget), we need identifying info.
-		// Let's assume this WS is for AGENTS for now (P0).
-		// If userID is missing, we might want to reject?
-		// But let's allow it for testing if needed, or better, return error.
 	}
 
 	if userID == uuid.Nil {
-		// Check query param for user_id (dev testing)
-		if uidStr := ctx.Query("user_id"); uidStr != "" {
-			userID, _ = uuid.Parse(uidStr)
-		}
-	}
-
-	if userID == uuid.Nil {
-		// Unauthorized
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}

@@ -37,17 +37,25 @@ func (s *environmentServiceImpl) CreateEnvironment(ctx context.Context, appID uu
 		env.SLAThresholdSeconds = *slaThreshold
 	}
 
-	return s.envRepo.Create(ctx, env)
+	created, err := s.envRepo.Create(ctx, env)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create environment: %w", err)
+	}
+	return created, nil
 }
 
 func (s *environmentServiceImpl) ListEnvironments(ctx context.Context, appID uuid.UUID) ([]*entity.Environment, error) {
-	return s.envRepo.ListByApp(ctx, appID)
+	envs, err := s.envRepo.ListByApp(ctx, appID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list environments for app %s: %w", appID, err)
+	}
+	return envs, nil
 }
 
 func (s *environmentServiceImpl) GetEnvironment(ctx context.Context, appID uuid.UUID, code string) (*entity.Environment, error) {
 	env, err := s.envRepo.GetByAppAndCode(ctx, appID, code)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get environment by code %s: %w", code, err)
 	}
 	if env == nil {
 		return nil, entity.ErrEnvironmentNotFound
@@ -79,5 +87,8 @@ func (s *environmentServiceImpl) VerifyAPIKey(ctx context.Context, apiKey string
 
 func (s *environmentServiceImpl) UpdateEnvironment(ctx context.Context, env *entity.Environment) error {
 	env.UpdatedAt = time.Now()
-	return s.envRepo.Update(ctx, env)
+	if err := s.envRepo.Update(ctx, env); err != nil {
+		return fmt.Errorf("failed to update environment %s: %w", env.ID, err)
+	}
+	return nil
 }

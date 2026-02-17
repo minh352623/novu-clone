@@ -12,6 +12,7 @@ import (
 	"CONVERDA/internal/workflow/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type triggerServiceImpl struct {
@@ -120,13 +121,13 @@ func (s *triggerServiceImpl) executeStepsFrom(ctx context.Context,
 		case entity.StepTypeDelay:
 			handler = s.delayHandler
 		default:
-			global.Logger.Error("Workflow trigger: unknown step type " + step.StepType)
+			global.Logger.Error("workflow_trigger: unknown step type", zap.String("stepType", step.StepType), zap.String("executionID", exec.ID.String()))
 			s.markStepFailed(ctx, stepExec, exec, "unknown step type: "+step.StepType)
 			return
 		}
 
 		if err := handler.Execute(ctx, step, exec, stepExec); err != nil {
-			global.Logger.Error("Workflow trigger: step " + step.ID.String() + " failed: " + err.Error())
+			global.Logger.Error("workflow_trigger: step execution failed", zap.String("stepID", step.ID.String()), zap.String("executionID", exec.ID.String()), zap.Error(err))
 			s.markStepFailed(ctx, stepExec, exec, err.Error())
 			return
 		}
@@ -141,16 +142,20 @@ func (s *triggerServiceImpl) executeStepsFrom(ctx context.Context,
 		completedAt := time.Now()
 		stepExec.Status = entity.StepStatusCompleted
 		stepExec.CompletedAt = &completedAt
-		_ = s.execRepo.UpdateStepExecution(ctx, stepExec)
+		if err := s.execRepo.UpdateStepExecution(ctx, stepExec); err != nil {
+			global.Logger.Warn("workflow_trigger: failed to update step execution status", zap.String("stepExecID", stepExec.ID.String()), zap.Error(err))
+		}
 	}
 
 	// All steps completed
 	completedAt := time.Now()
 	exec.Status = entity.WorkflowExecutionCompleted
 	exec.CompletedAt = &completedAt
-	_ = s.execRepo.UpdateExecution(ctx, exec)
+	if err := s.execRepo.UpdateExecution(ctx, exec); err != nil {
+		global.Logger.Warn("workflow_trigger: failed to update execution status", zap.String("executionID", exec.ID.String()), zap.Error(err))
+	}
 
-	global.Logger.Info("Workflow execution completed: " + exec.ID.String())
+	global.Logger.Info("workflow_trigger: execution completed", zap.String("executionID", exec.ID.String()))
 }
 
 func (s *triggerServiceImpl) markStepFailed(ctx context.Context,
@@ -160,9 +165,13 @@ func (s *triggerServiceImpl) markStepFailed(ctx context.Context,
 	stepExec.Status = entity.StepStatusFailed
 	stepExec.CompletedAt = &now
 	stepExec.Output = map[string]interface{}{"error": reason}
-	_ = s.execRepo.UpdateStepExecution(ctx, stepExec)
+	if err := s.execRepo.UpdateStepExecution(ctx, stepExec); err != nil {
+		global.Logger.Warn("workflow_trigger: failed to mark step as failed", zap.String("stepExecID", stepExec.ID.String()), zap.Error(err))
+	}
 
 	exec.Status = entity.WorkflowExecutionFailed
 	exec.CompletedAt = &now
-	_ = s.execRepo.UpdateExecution(ctx, exec)
+	if err := s.execRepo.UpdateExecution(ctx, exec); err != nil {
+		global.Logger.Warn("workflow_trigger: failed to mark execution as failed", zap.String("executionID", exec.ID.String()), zap.Error(err))
+	}
 }

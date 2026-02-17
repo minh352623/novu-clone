@@ -51,6 +51,8 @@ definitions:
         type: string
       name:
         type: string
+      sla_threshold_seconds:
+        type: integer
       tenant_id:
         type: string
       updated_at:
@@ -62,6 +64,8 @@ definitions:
         type: string
       name:
         type: string
+      sla_threshold_seconds:
+        type: integer
     required:
     - name
     type: object
@@ -69,6 +73,8 @@ definitions:
     properties:
       code:
         type: string
+      sla_threshold_seconds:
+        type: integer
     required:
     - code
     type: object
@@ -98,11 +104,50 @@ definitions:
         items:
           type: string
         type: array
+      max_retries:
+        type: integer
+      retry_backoff_seconds:
+        type: integer
+      retry_timeout_seconds:
+        type: integer
       url:
         type: string
     required:
     - environment_id
     - url
+    type: object
+  CONVERDA_internal_apps_controller_dto.DailyMetricDTO:
+    properties:
+      date:
+        type: string
+      failed:
+        type: integer
+      inbound:
+        type: integer
+      outbound:
+        type: integer
+      success:
+        type: integer
+    type: object
+  CONVERDA_internal_apps_controller_dto.DetailedMetricsResponse:
+    properties:
+      by_provider:
+        additionalProperties:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.ProviderMetricDTO'
+        type: object
+      failure_count:
+        type: integer
+      inbound_messages:
+        type: integer
+      outbound_messages:
+        type: integer
+      success_count:
+        type: integer
+      success_rate:
+        description: percentage
+        type: number
+      total_messages:
+        type: integer
     type: object
   CONVERDA_internal_apps_controller_dto.EnvironmentResponse:
     properties:
@@ -118,6 +163,21 @@ definitions:
         items:
           $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyResponse'
         type: array
+      rate_limit_daily:
+        type: integer
+      rate_limit_rpm:
+        type: integer
+      sla_threshold_seconds:
+        type: integer
+    type: object
+  CONVERDA_internal_apps_controller_dto.ProviderMetricDTO:
+    properties:
+      failed:
+        type: integer
+      success:
+        type: integer
+      total:
+        type: integer
     type: object
   CONVERDA_internal_apps_controller_dto.ProviderResponse:
     properties:
@@ -157,12 +217,30 @@ definitions:
       name:
         type: string
     type: object
+  CONVERDA_internal_apps_controller_dto.TimeSeriesResponse:
+    properties:
+      days:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.DailyMetricDTO'
+        type: array
+    type: object
   CONVERDA_internal_apps_controller_dto.UpdateAppRequest:
     properties:
       description:
         type: string
       name:
         type: string
+      sla_threshold_seconds:
+        type: integer
+    type: object
+  CONVERDA_internal_apps_controller_dto.UpdateEnvironmentConfigRequest:
+    properties:
+      rate_limit_daily:
+        type: integer
+      rate_limit_rpm:
+        type: integer
+      sla_threshold_seconds:
+        type: integer
     type: object
   CONVERDA_internal_apps_controller_dto.UpdateProviderRequest:
     properties:
@@ -184,6 +262,12 @@ definitions:
         type: array
       is_active:
         type: boolean
+      max_retries:
+        type: integer
+      retry_backoff_seconds:
+        type: integer
+      retry_timeout_seconds:
+        type: integer
       url:
         type: string
     type: object
@@ -205,12 +289,66 @@ definitions:
         type: string
       is_active:
         type: boolean
+      max_retries:
+        type: integer
+      retry_backoff_seconds:
+        type: integer
+      retry_timeout_seconds:
+        type: integer
       secret:
         type: string
       tenant_id:
         type: string
       url:
         type: string
+    type: object
+  CONVERDA_internal_health_dto.QueueHealth:
+    properties:
+      assigned_count:
+        type: integer
+      avg_wait_time_seconds:
+        type: number
+      overdue_count:
+        type: integer
+      total_active:
+        type: integer
+      unassigned_count:
+        type: integer
+    type: object
+  CONVERDA_internal_health_dto.SLACompliance:
+    properties:
+      breached:
+        type: integer
+      compliance_rate_percent:
+        type: number
+      total_resolved:
+        type: integer
+      within_sla:
+        type: integer
+    type: object
+  CONVERDA_internal_health_dto.SystemHealthResponse:
+    properties:
+      generated_at:
+        type: string
+      queue_health:
+        $ref: '#/definitions/CONVERDA_internal_health_dto.QueueHealth'
+      sla_compliance:
+        $ref: '#/definitions/CONVERDA_internal_health_dto.SLACompliance'
+      webhook_health:
+        $ref: '#/definitions/CONVERDA_internal_health_dto.WebhookHealth'
+    type: object
+  CONVERDA_internal_health_dto.WebhookHealth:
+    properties:
+      failed_count:
+        type: integer
+      pending_retries:
+        type: integer
+      success_count:
+        type: integer
+      success_rate_percent:
+        type: number
+      total_dispatched:
+        type: integer
     type: object
   CONVERDA_internal_iam_controller_dto.AcceptInvitationRequest:
     properties:
@@ -487,6 +625,13 @@ definitions:
       last_login_at:
         type: string
     type: object
+  CONVERDA_internal_messaging_controller_dto.ActivityPoint:
+    properties:
+      time:
+        type: string
+      value:
+        type: integer
+    type: object
   CONVERDA_internal_messaging_controller_dto.AddParticipantsRequest:
     properties:
       participants:
@@ -520,6 +665,38 @@ definitions:
       member_id:
         description: Optional, if empty assigns to caller
         type: string
+    type: object
+  CONVERDA_internal_messaging_controller_dto.AssignmentLogResponse:
+    properties:
+      assigned_at:
+        type: string
+      assigned_to_display_name:
+        type: string
+      assigned_to_member_id:
+        type: string
+      id:
+        type: string
+      resolved_at:
+        type: string
+      response_time_seconds:
+        type: integer
+      thread_id:
+        type: string
+    type: object
+  CONVERDA_internal_messaging_controller_dto.AuditTrailResponse:
+    properties:
+      logs:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.AssignmentLogResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      thread_id:
+        type: string
+      total:
+        type: integer
     type: object
   CONVERDA_internal_messaging_controller_dto.BulkAssignRequest:
     properties:
@@ -635,6 +812,21 @@ definitions:
         - $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats'
         description: Partner dashboard uses TeamStats for now
     type: object
+  CONVERDA_internal_messaging_controller_dto.PersonalDashboardResponse:
+    properties:
+      activity_timeline:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.ActivityPoint'
+        type: array
+      stats:
+        $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.AgentStats'
+      team_comparison:
+        $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats'
+      top_performers:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_messaging_domain_model_entity.AgentStats'
+        type: array
+    type: object
   CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest:
     properties:
       content:
@@ -730,6 +922,17 @@ definitions:
       total_conversations:
         type: integer
     type: object
+  CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse:
+    properties:
+      languages:
+        items:
+          type: string
+        type: array
+      template_id:
+        type: string
+      version:
+        type: integer
+    type: object
   CONVERDA_internal_notification_controller_dto.CreateGroupRequest:
     properties:
       description:
@@ -760,6 +963,23 @@ definitions:
     required:
     - content_html
     - name
+    type: object
+  CONVERDA_internal_notification_controller_dto.CreateTemplateContentRequest:
+    properties:
+      body_html:
+        type: string
+      body_push:
+        items:
+          type: integer
+        type: array
+      body_text:
+        type: string
+      language_code:
+        type: string
+      subject:
+        type: string
+    required:
+    - language_code
     type: object
   CONVERDA_internal_notification_controller_dto.GroupResponse:
     properties:
@@ -839,6 +1059,25 @@ definitions:
     - recipient
     - template_code
     type: object
+  CONVERDA_internal_notification_controller_dto.TemplateContentResponse:
+    properties:
+      body_html:
+        type: string
+      body_text:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      language_code:
+        type: string
+      subject:
+        type: string
+      template_id:
+        type: string
+      version:
+        type: integer
+    type: object
   CONVERDA_internal_notification_controller_dto.UpdateGroupRequest:
     properties:
       description:
@@ -859,6 +1098,19 @@ definitions:
       variables_schema:
         additionalProperties: true
         type: object
+    type: object
+  CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest:
+    properties:
+      body_html:
+        type: string
+      body_push:
+        items:
+          type: integer
+        type: array
+      body_text:
+        type: string
+      subject:
+        type: string
     type: object
   CONVERDA_internal_r2_service_dto.ImageDTO:
     properties:
@@ -901,6 +1153,106 @@ definitions:
       success:
         type: boolean
       url:
+        type: string
+    type: object
+  CONVERDA_internal_workflow_controller_dto.CreateStepRequest:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      order:
+        type: integer
+      parent_step_id:
+        type: string
+      step_type:
+        enum:
+        - channel
+        - delay
+        - digest
+        type: string
+    required:
+    - step_type
+    type: object
+  CONVERDA_internal_workflow_controller_dto.CreateWorkflowRequest:
+    properties:
+      name:
+        type: string
+      trigger_identifier:
+        type: string
+    required:
+    - name
+    - trigger_identifier
+    type: object
+  CONVERDA_internal_workflow_controller_dto.StepResponse:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      created_at:
+        type: string
+      id:
+        type: string
+      order:
+        type: integer
+      parent_step_id:
+        type: string
+      step_type:
+        type: string
+      workflow_id:
+        type: string
+    type: object
+  CONVERDA_internal_workflow_controller_dto.TriggerWorkflowRequest:
+    properties:
+      environment_id:
+        type: string
+      payload:
+        additionalProperties: true
+        type: object
+      subscriber_key:
+        type: string
+      trigger_identifier:
+        type: string
+    required:
+    - environment_id
+    - subscriber_key
+    - trigger_identifier
+    type: object
+  CONVERDA_internal_workflow_controller_dto.UpdateStepRequest:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      order:
+        type: integer
+      step_type:
+        type: string
+    type: object
+  CONVERDA_internal_workflow_controller_dto.UpdateWorkflowRequest:
+    properties:
+      name:
+        type: string
+      trigger_identifier:
+        type: string
+    type: object
+  CONVERDA_internal_workflow_controller_dto.WorkflowResponse:
+    properties:
+      created_at:
+        type: string
+      environment_id:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      steps:
+        items:
+          $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.StepResponse'
+        type: array
+      trigger_identifier:
+        type: string
+      updated_at:
         type: string
     type: object
   CONVERDA_pkg_response.APIError:
@@ -1158,6 +1510,46 @@ paths:
       summary: Create environment
       tags:
       - Apps
+  /apps/{app_id}/environments/{env_id}:
+    put:
+      consumes:
+      - application/json
+      description: Update rate limit and SLA settings for an environment
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: Environment ID
+        in: path
+        name: env_id
+        required: true
+        type: string
+      - description: Config update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.UpdateEnvironmentConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.EnvironmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update environment configuration
+      tags:
+      - Apps
   /apps/{app_id}/metrics:
     get:
       parameters:
@@ -1182,6 +1574,58 @@ paths:
       security:
       - BearerAuth: []
       summary: Get App usage metrics
+      tags:
+      - Apps
+  /apps/{app_id}/metrics/detailed:
+    get:
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: 'Days to look back (default: 30)'
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.DetailedMetricsResponse'
+      security:
+      - BearerAuth: []
+      summary: Get detailed usage metrics for an app
+      tags:
+      - Apps
+  /apps/{app_id}/metrics/timeseries:
+    get:
+      parameters:
+      - description: App ID
+        in: path
+        name: app_id
+        required: true
+        type: string
+      - description: 'Days to look back (default: 30)'
+        in: query
+        name: days
+        type: integer
+      - description: Optional environment filter
+        in: query
+        name: environment_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_apps_controller_dto.TimeSeriesResponse'
+      security:
+      - BearerAuth: []
+      summary: Get daily time-series metrics for an app
       tags:
       - Apps
   /apps/{app_id}/providers:
@@ -1538,6 +1982,43 @@ paths:
       summary: Assign Conversation
       tags:
       - Messaging
+  /conversations/{id}/audit-trail:
+    get:
+      description: Fetch paginated history of assignments and resolutions
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      - description: Filter from date (RFC3339)
+        in: query
+        name: from
+        type: string
+      - description: Filter to date (RFC3339)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.AuditTrailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Conversation Audit Trail
+      tags:
+      - Messaging
   /conversations/{id}/messages:
     post:
       consumes:
@@ -1825,7 +2306,8 @@ paths:
       - Messaging
   /conversations/ws:
     get:
-      description: Connect to WebSocket for real-time updates
+      description: Connect to WebSocket for real-time messaging updates (requires
+        auth)
       responses: {}
       summary: WebSocket Connection
       tags:
@@ -1868,6 +2350,36 @@ paths:
       summary: Get Agent Dashboard
       tags:
       - Dashboards
+  /dashboards/health:
+    get:
+      description: 'Get operational health overview: queue state, SLA compliance,
+        webhook reliability'
+      parameters:
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      - description: From Date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To Date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_health_dto.SystemHealthResponse'
+      security:
+      - BearerAuth: []
+      summary: Get System Health Dashboard
+      tags:
+      - System Health
   /dashboards/partner:
     get:
       description: Get comprehensive partner performance metrics
@@ -1901,6 +2413,39 @@ paths:
       summary: Get Partner Dashboard
       tags:
       - Dashboards
+  /dashboards/personal:
+    get:
+      description: Get comprehensive metrics and activity for the current agent
+      parameters:
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      - description: From Date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To Date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      - description: SLA Threshold override (seconds)
+        in: query
+        name: sla_threshold
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_messaging_controller_dto.PersonalDashboardResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Personal Dashboard
+      tags:
+      - Analytics
   /dashboards/team:
     get:
       description: Get comprehensive team performance metrics
@@ -2276,6 +2821,104 @@ paths:
       summary: Send Notification
       tags:
       - Notification
+  /notifications/templates/{id}/content:
+    post:
+      consumes:
+      - application/json
+      description: Add content (subject, body) in a new language for a template
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Content data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.CreateTemplateContentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.TemplateContentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Add template content for a new language
+      tags:
+      - Templates
+  /notifications/templates/{id}/content/{lang}:
+    put:
+      consumes:
+      - application/json
+      description: Update subject and body for a specific language
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Language Code
+        in: path
+        name: lang
+        required: true
+        type: string
+      - description: Content update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update template content for a language
+      tags:
+      - Templates
+  /notifications/templates/{id}/languages:
+    get:
+      description: Returns all language codes with content for a template
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List available languages for a template
+      tags:
+      - Templates
   /pricing-plans:
     get:
       consumes:
@@ -3378,6 +4021,223 @@ paths:
       summary: Update webhook
       tags:
       - Webhooks
+  /workflows:
+    get:
+      parameters:
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse'
+            type: array
+      summary: List workflows by environment
+      tags:
+      - Workflows
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Environment ID
+        in: query
+        name: environment_id
+        required: true
+        type: string
+      - description: Workflow data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.CreateWorkflowRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse'
+      summary: Create a new workflow
+      tags:
+      - Workflows
+  /workflows/{id}:
+    delete:
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete a workflow
+      tags:
+      - Workflows
+    get:
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse'
+      summary: Get workflow by ID
+      tags:
+      - Workflows
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.UpdateWorkflowRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse'
+      summary: Update a workflow
+      tags:
+      - Workflows
+  /workflows/{id}/steps:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Step data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.CreateStepRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.StepResponse'
+      summary: Add a step to a workflow
+      tags:
+      - Workflows
+  /workflows/{id}/steps/{stepId}:
+    delete:
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Step ID
+        in: path
+        name: stepId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete a workflow step
+      tags:
+      - Workflows
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Step ID
+        in: path
+        name: stepId
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.UpdateStepRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.StepResponse'
+      summary: Update a workflow step
+      tags:
+      - Workflows
+  /workflows/{id}/toggle:
+    post:
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse'
+      summary: Toggle workflow active state
+      tags:
+      - Workflows
+  /workflows/trigger:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Trigger data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CONVERDA_internal_workflow_controller_dto.TriggerWorkflowRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Trigger a workflow execution
+      tags:
+      - Workflows
 securityDefinitions:
   BearerAuth:
     description: Enter the token with the `Bearer ` prefix, e.g. "Bearer abcde12345"

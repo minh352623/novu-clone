@@ -91,7 +91,7 @@ func (s *r2Service) UploadFileBase64(ctx context.Context, images []dto.ImageDTO)
 				if r := recover(); r != nil {
 					// Log the panic (assuming usage of global logger or similar mechanism if available,
 					// or just ensure wg.Done is called which is covered above)
-					fmt.Printf("Recovered from panic in UploadFileBase64 goroutine: %v\n", r)
+					global.Logger.Error("Recovered from panic in UploadFileBase64 goroutine: " + fmt.Sprintf("%v", r))
 
 					// Record failure for this item
 					mu.Lock()

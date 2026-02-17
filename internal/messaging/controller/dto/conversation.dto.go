@@ -34,8 +34,10 @@ type BulkAssignRequest struct {
 }
 
 type WsEvent struct {
-	Type    string      `json:"type"`
-	Payload interface{} `json:"payload"`
+	ID        string      `json:"id"`
+	Type      string      `json:"type"`
+	Payload   interface{} `json:"payload"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 type ParticipantDTO struct {
@@ -115,6 +117,9 @@ type AssignmentLogResponse struct {
 type AuditTrailResponse struct {
 	ThreadID uuid.UUID                `json:"thread_id"`
 	Logs     []*AssignmentLogResponse `json:"logs"`
+	Total    int64                    `json:"total"`
+	Page     int                      `json:"page"`
+	PageSize int                      `json:"page_size"`
 }
 
 func ToMessageResponse(m *entity.Message) *MessageResponse {
@@ -142,7 +147,7 @@ func ToThreadResponse(p *entity.Thread) *ThreadResponse {
 		EnvironmentID: p.EnvironmentID,
 		Type:          p.Type,
 		Channel:       p.Channel,
-		Status:        p.Status,
+		Status:        string(p.Status),
 		Metadata:      p.Metadata,
 		CreatedAt:     p.CreatedAt,
 		UpdatedAt:     p.UpdatedAt,

@@ -32,7 +32,7 @@ func (r *webhookRepository) GetByEvent(ctx context.Context, envID uuid.UUID, eve
 	if err != nil {
 		return nil, err
 	}
-	var parameters []*entity.Webhook
+	parameters := make([]*entity.Webhook, 0, len(models))
 	for _, m := range models {
 		parameters = append(parameters, mapper.ToWebhookDomain(m))
 	}
@@ -68,7 +68,7 @@ func (r *webhookLogRepository) GetPendingRetries(ctx context.Context, limit int)
 		return nil, err
 	}
 
-	var logs []*entity.WebhookLog
+	logs := make([]*entity.WebhookLog, 0, len(models))
 	for _, m := range models {
 		logs = append(logs, mapper.ToWebhookLogDomain(m))
 	}

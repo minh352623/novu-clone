@@ -1,9 +1,11 @@
 package gateway
 
 import (
-	"log"
+	"encoding/json"
 	"net/http"
 	"time"
+
+	"CONVERDA/global"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -60,17 +62,22 @@ func (c *Client) readPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		_, _, err := c.conn.ReadMessage()
+		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				global.Logger.Warn("ws: unexpected close error: " + err.Error())
 			}
 			break
 		}
-		// Currently we don't process inbound messages from WS (we use REST for that)
-		// But if we did, we would send them to the hub here.
-		// message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		// c.hub.broadcast <- message
+
+		// Parse inbound event and forward to hub for processing
+		var event WsInboundEvent
+		if err := json.Unmarshal(message, &event); err != nil {
+			global.Logger.Warn("ws: invalid inbound message from " + c.UserID.String() + ": " + err.Error())
+			continue
+		}
+
+		c.Hub.HandleInbound(c, &event)
 	}
 }
 
@@ -119,7 +126,7 @@ func (c *Client) writePump() {
 func ServeWs(hub *Hub, c *gin.Context, userID uuid.UUID, envID uuid.UUID) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Println(err)
+		global.Logger.Error("ws: failed to upgrade connection: " + err.Error())
 		return
 	}
 	client := &Client{Hub: hub, conn: conn, send: make(chan []byte, 256), UserID: userID, EnvironmentID: envID}

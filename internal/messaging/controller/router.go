@@ -19,8 +19,8 @@ func RegisterMessagingRoutes(
 	// Public or Webhook/ApiKey Protected
 	group.POST("/inbound", envAuthMiddleware, response.Wrap(conversationController.InboundMessage, http.StatusCreated))
 
-	// WebSocket
-	group.GET("/ws", conversationController.ServeWS)
+	// WebSocket (auth required)
+	group.GET("/ws", authMiddleware, conversationController.ServeWS)
 
 	// Agent Protected
 	if authMiddleware != nil {
@@ -43,6 +43,9 @@ func RegisterMessagingRoutes(
 		group.POST("/group/:id/participants", response.Wrap(conversationController.AddGroupParticipants, http.StatusOK))
 		group.DELETE("/group/:id/participants/:memberID", response.Wrap(conversationController.RemoveGroupParticipant, http.StatusOK))
 		group.POST("/:id/read", response.Wrap(conversationController.MarkAsRead, http.StatusOK))
+
+		// Audit Trail
+		group.GET("/:id/audit-trail", response.Wrap(conversationController.GetThreadAuditTrail, http.StatusOK))
 
 		// Messages & Notes
 		group.POST("/:id/messages", response.Wrap(conversationController.ReplyMessage, http.StatusCreated))

@@ -1,8 +1,10 @@
 package email
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/pkg/setting"
@@ -15,8 +17,11 @@ import (
 )
 
 type sesEmailService struct {
-	client *sesv2.Client
-	from   string
+	client     *sesv2.Client
+	from       string
+	inviteBase string
+	htmlTmpl   *template.Template
+	textTmpl   *template.Template
 }
 
 // NewSESEmailService creates a new SES email service
@@ -35,24 +40,62 @@ func NewSESEmailService(sesSetting setting.SESSetting) (service.EmailService, er
 
 	client := sesv2.NewFromConfig(cfg)
 
+	// Parse templates at init time (fail-fast)
+	htmlTmpl, err := template.New("invitation_html").Parse(invitationHTMLTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HTML template: %w", err)
+	}
+	textTmpl, err := template.New("invitation_text").Parse(invitationTextTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse text template: %w", err)
+	}
+
+	inviteBase := sesSetting.InviteBaseURL
+	if inviteBase == "" {
+		inviteBase = "https://app.converda.com/invite"
+	}
+
 	return &sesEmailService{
-		client: client,
-		from:   sesSetting.FromEmail,
+		client:     client,
+		from:       sesSetting.FromEmail,
+		inviteBase: inviteBase,
+		htmlTmpl:   htmlTmpl,
+		textTmpl:   textTmpl,
 	}, nil
 }
 
-// SendInvitation sends an invitation email
-func (s *sesEmailService) SendInvitation(ctx context.Context, toEmail, token, roleName, tenantName string) error {
-	subject := "Invitation to join " + tenantName
-	htmlBody := fmt.Sprintf(`
-		<h1>You have been invited to join %s</h1>
-		<p>Role: <strong>%s</strong></p>
-		<p>Click the link below to accept the invitation:</p>
-		<a href="https://app.converda.com/invite?token=%s">Accept Invitation</a>
-		<p>This link expires in 7 days.</p>
-	`, tenantName, roleName, token)
+// invitationData holds variables for the invitation email template.
+type invitationData struct {
+	TenantName  string
+	RoleName    string
+	InviterName string
+	AcceptURL   string
+	ExpiresIn   string
+}
 
-	textBody := fmt.Sprintf("You have been invited to join %s as %s. Token: %s", tenantName, roleName, token)
+// SendInvitation sends an invitation email
+func (s *sesEmailService) SendInvitation(ctx context.Context, toEmail, token, roleName, tenantName, inviterName string) error {
+	data := invitationData{
+		TenantName:  tenantName,
+		RoleName:    roleName,
+		InviterName: inviterName,
+		AcceptURL:   fmt.Sprintf("%s?token=%s", s.inviteBase, token),
+		ExpiresIn:   "7 days",
+	}
+
+	// Compile HTML body
+	var htmlBuf bytes.Buffer
+	if err := s.htmlTmpl.Execute(&htmlBuf, data); err != nil {
+		return fmt.Errorf("failed to compile HTML template: %w", err)
+	}
+
+	// Compile plain-text body
+	var textBuf bytes.Buffer
+	if err := s.textTmpl.Execute(&textBuf, data); err != nil {
+		return fmt.Errorf("failed to compile text template: %w", err)
+	}
+
+	subject := fmt.Sprintf("Invitation to join %s", tenantName)
 
 	input := &sesv2.SendEmailInput{
 		FromEmailAddress: aws.String(s.from),
@@ -66,10 +109,10 @@ func (s *sesEmailService) SendInvitation(ctx context.Context, toEmail, token, ro
 				},
 				Body: &types.Body{
 					Html: &types.Content{
-						Data: aws.String(htmlBody),
+						Data: aws.String(htmlBuf.String()),
 					},
 					Text: &types.Content{
-						Data: aws.String(textBody),
+						Data: aws.String(textBuf.String()),
 					},
 				},
 			},

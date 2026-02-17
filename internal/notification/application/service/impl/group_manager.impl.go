@@ -2,10 +2,11 @@ package impl
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	"CONVERDA/internal/notification/application/service"
+	domain "CONVERDA/internal/notification/domain"
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
 
@@ -24,10 +25,10 @@ func (s *groupManager) CreateGroup(ctx context.Context, envID uuid.UUID, name, k
 	// Check if key exists
 	existing, err := s.repo.GetByKey(ctx, envID, key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to check group key: %w", err)
 	}
 	if existing != nil {
-		return nil, errors.New("group with this key already exists")
+		return nil, domain.ErrGroupDuplicateKey
 	}
 
 	group := &entity.NotificationGroup{
@@ -45,7 +46,7 @@ func (s *groupManager) CreateGroup(ctx context.Context, envID uuid.UUID, name, k
 	}
 
 	if err := s.repo.Create(ctx, group); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create group: %w", err)
 	}
 	return group, nil
 }
@@ -53,32 +54,35 @@ func (s *groupManager) CreateGroup(ctx context.Context, envID uuid.UUID, name, k
 func (s *groupManager) UpdateGroup(ctx context.Context, envID uuid.UUID, id uuid.UUID, name, description string) error {
 	group, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch group %s: %w", id, err)
 	}
 	if group == nil {
-		return errors.New("group not found")
+		return domain.ErrGroupNotFound
 	}
 	if group.EnvironmentID != envID {
-		return errors.New("group not found in this environment")
+		return domain.ErrGroupNotInEnv
 	}
 
 	group.Name = name
 	group.Description = description
 	group.UpdatedAt = time.Now()
 
-	return s.repo.Update(ctx, group)
+	if err := s.repo.Update(ctx, group); err != nil {
+		return fmt.Errorf("failed to update group %s: %w", id, err)
+	}
+	return nil
 }
 
 func (s *groupManager) DeleteGroup(ctx context.Context, envID uuid.UUID, id uuid.UUID) error {
 	group, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch group %s: %w", id, err)
 	}
 	if group == nil {
 		return nil // Already deleted
 	}
 	if group.EnvironmentID != envID {
-		return errors.New("group not found in this environment")
+		return domain.ErrGroupNotInEnv
 	}
 
 	return s.repo.Delete(ctx, id)
@@ -87,7 +91,7 @@ func (s *groupManager) DeleteGroup(ctx context.Context, envID uuid.UUID, id uuid
 func (s *groupManager) GetGroup(ctx context.Context, envID uuid.UUID, id uuid.UUID) (*entity.NotificationGroup, error) {
 	group, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch group %s: %w", id, err)
 	}
 	if group != nil && group.EnvironmentID != envID {
 		return nil, nil // Hide if not in env
@@ -96,9 +100,17 @@ func (s *groupManager) GetGroup(ctx context.Context, envID uuid.UUID, id uuid.UU
 }
 
 func (s *groupManager) ListGroups(ctx context.Context, envID uuid.UUID, limit, offset int) ([]*entity.NotificationGroup, int64, error) {
-	return s.repo.List(ctx, envID, limit, offset)
+	groups, total, err := s.repo.List(ctx, envID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list groups for env %s: %w", envID, err)
+	}
+	return groups, total, nil
 }
 
 func (s *groupManager) GetByKey(ctx context.Context, envID uuid.UUID, key string) (*entity.NotificationGroup, error) {
-	return s.repo.GetByKey(ctx, envID, key)
+	group, err := s.repo.GetByKey(ctx, envID, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group by key %s for env %s: %w", key, envID, err)
+	}
+	return group, nil
 }

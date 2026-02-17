@@ -29,7 +29,7 @@ type ConversationService interface {
 	AddGroupParticipants(ctx context.Context, envID, threadID uuid.UUID, participants []*entity.ThreadParticipant) error
 	RemoveGroupParticipant(ctx context.Context, envID, threadID uuid.UUID, entityType string, entityID uuid.UUID) error
 	MarkThreadRead(ctx context.Context, envID, threadID, memberID uuid.UUID) error
-	GetThreadAuditTrail(ctx context.Context, envID, threadID uuid.UUID) (*dto.AuditTrailResponse, error)
+	GetThreadAuditTrail(ctx context.Context, envID, threadID uuid.UUID, page, pageSize int, from, to *time.Time) (*dto.AuditTrailResponse, error)
 
 	// Assignment
 	AssignThread(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID, memberID uuid.UUID) error

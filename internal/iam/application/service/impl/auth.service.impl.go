@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/domain/model/entity"
 	"CONVERDA/internal/iam/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // authServiceImpl implements AuthService
@@ -51,6 +53,7 @@ func (s *authServiceImpl) Register(ctx context.Context, email, password string, 
 func (s *authServiceImpl) Login(ctx context.Context, email, password string) (*entity.User, error) {
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
+		global.Logger.Error("auth: failed to get user by email", zap.String("email", email), zap.Error(err))
 		return nil, service.ErrInvalidCredentials
 	}
 	if user == nil {
@@ -64,8 +67,7 @@ func (s *authServiceImpl) Login(ctx context.Context, email, password string) (*e
 	// Record login
 	user.RecordLogin()
 	if err := s.userRepo.UpdateLastLogin(ctx, user.ID); err != nil {
-		// Log but don't fail login
-		_ = err
+		global.Logger.Warn("auth: failed to update last login", zap.String("userID", user.ID.String()), zap.Error(err))
 	}
 
 	return user, nil

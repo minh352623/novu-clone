@@ -64,6 +64,12 @@ func (c *JobController) ScheduleJob(ctx *gin.Context) (interface{}, error) {
 		// Asynchronous processing recommended. For MVP synchronous or fire-and-forget.
 		// Go routine?
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					// Use global logger or slog here
+					_ = r // panic recovered, job.ID can be logged
+				}
+			}()
 			// Create a background context with timeout?
 			bgCtx := context.Background()
 			_ = c.scheduler.ProcessJob(bgCtx, job.ID)
@@ -91,7 +97,7 @@ func (c *JobController) ListJobs(ctx *gin.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	var jobResponses []*dto.JobResponse
+	jobResponses := make([]*dto.JobResponse, 0, len(jobs))
 	for _, j := range jobs {
 		jobResponses = append(jobResponses, toJobResponse(j))
 	}

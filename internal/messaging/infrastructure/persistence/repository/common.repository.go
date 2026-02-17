@@ -88,7 +88,7 @@ func (r *threadRepository) Create(ctx context.Context, thread *entity.Thread) (*
 		EnvironmentID: thread.EnvironmentID,
 		Type:          thread.Type,
 		Channel:       thread.Channel,
-		Status:        thread.Status,
+		Status:        string(thread.Status),
 		Metadata:      datatypes.JSON(thread.Metadata),
 		ReferenceHash: thread.ReferenceHash,
 		CreatedAt:     thread.CreatedAt,
@@ -110,7 +110,7 @@ func (r *threadRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.T
 		EnvironmentID: m.EnvironmentID,
 		Type:          m.Type,
 		Channel:       m.Channel,
-		Status:        m.Status,
+		Status:        entity.ThreadStatus(m.Status),
 		Metadata:      json.RawMessage(m.Metadata),
 		ReferenceHash: m.ReferenceHash,
 		IsOverdue:     m.IsOverdue,
@@ -129,7 +129,7 @@ func (r *threadRepository) GetByIDAndEnv(ctx context.Context, id, envID uuid.UUI
 		EnvironmentID: m.EnvironmentID,
 		Type:          m.Type,
 		Channel:       m.Channel,
-		Status:        m.Status,
+		Status:        entity.ThreadStatus(m.Status),
 		Metadata:      json.RawMessage(m.Metadata),
 		ReferenceHash: m.ReferenceHash,
 		IsOverdue:     m.IsOverdue,
@@ -144,7 +144,7 @@ func (r *threadRepository) Update(ctx context.Context, thread *entity.Thread) er
 		EnvironmentID: thread.EnvironmentID,
 		Type:          thread.Type,
 		Channel:       thread.Channel,
-		Status:        thread.Status,
+		Status:        string(thread.Status),
 		Metadata:      datatypes.JSON(thread.Metadata),
 		IsOverdue:     thread.IsOverdue,
 		UpdatedAt:     time.Now(),
@@ -180,14 +180,14 @@ func (r *threadRepository) List(ctx context.Context, filter domainRepo.ThreadFil
 		return nil, 0, err
 	}
 
-	var threads []*entity.Thread
+	threads := make([]*entity.Thread, 0, len(models))
 	for _, m := range models {
 		threads = append(threads, &entity.Thread{
 			ID:            m.ID,
 			EnvironmentID: m.EnvironmentID,
 			Type:          m.Type,
 			Channel:       m.Channel,
-			Status:        m.Status,
+			Status:        entity.ThreadStatus(m.Status),
 			Metadata:      json.RawMessage(m.Metadata),
 			IsOverdue:     m.IsOverdue,
 			CreatedAt:     m.CreatedAt,
@@ -231,7 +231,7 @@ func (r *threadRepository) GetParticipants(ctx context.Context, threadID uuid.UU
 	if err := r.db.WithContext(ctx).Where("thread_id = ?", threadID).Find(&models).Error; err != nil {
 		return nil, err
 	}
-	var res []*entity.ThreadParticipant
+	res := make([]*entity.ThreadParticipant, 0, len(models))
 	for _, m := range models {
 		res = append(res, &entity.ThreadParticipant{
 			ID:         m.ID,
@@ -268,7 +268,7 @@ func (r *threadRepository) GetDirectThreadBetweenEntities(ctx context.Context, t
 		EnvironmentID: m.EnvironmentID,
 		Type:          m.Type,
 		Channel:       m.Channel,
-		Status:        m.Status,
+		Status:        entity.ThreadStatus(m.Status),
 		Metadata:      json.RawMessage(m.Metadata),
 		IsOverdue:     m.IsOverdue,
 		CreatedAt:     m.CreatedAt,

@@ -74,6 +74,45 @@ func (r *assignmentLogRepository) GetByThread(ctx context.Context, threadID uuid
 	return result, nil
 }
 
+func (r *assignmentLogRepository) ListByThread(ctx context.Context, filter domainRepo.AuditTrailFilter) ([]*entity.AssignmentLog, int64, error) {
+	query := r.db.WithContext(ctx).Table("assignment_logs").Where("thread_id = ?", filter.ThreadID)
+
+	if filter.From != nil {
+		query = query.Where("assigned_at >= ?", *filter.From)
+	}
+	if filter.To != nil {
+		query = query.Where("assigned_at <= ?", *filter.To)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var models []model.AssignmentLogModel
+	err := query.
+		Order("assigned_at DESC").
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		Find(&models).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]*entity.AssignmentLog, len(models))
+	for i, m := range models {
+		result[i] = &entity.AssignmentLog{
+			ID:                  m.ID,
+			ThreadID:            m.ThreadID,
+			AssignedToMemberID:  m.AssignedToMemberID,
+			AssignedAt:          m.AssignedAt,
+			ResolvedAt:          m.ResolvedAt,
+			ResponseTimeSeconds: m.ResponseTimeSeconds,
+		}
+	}
+	return result, total, nil
+}
+
 func (r *assignmentLogRepository) Update(ctx context.Context, log *entity.AssignmentLog) error {
 	m := &model.AssignmentLogModel{
 		ID:                  log.ID,

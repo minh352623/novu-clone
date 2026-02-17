@@ -8,9 +8,11 @@ import (
 )
 
 var (
-	ErrInvitationExpired  = errors.New("invitation has expired")
-	ErrInvitationAccepted = errors.New("invitation has already been accepted")
-	ErrInvalidToken       = errors.New("invalid invitation token")
+	ErrInvitationExpired       = errors.New("invitation has expired")
+	ErrInvitationAccepted      = errors.New("invitation has already been accepted")
+	ErrInvalidToken            = errors.New("invalid invitation token")
+	ErrInvitationEmailRequired = errors.New("email is required")
+	ErrInvitationTokenRequired = errors.New("token is required")
 )
 
 type InvitationStatus string
@@ -38,7 +40,7 @@ type TenantInvitation struct {
 
 func NewTenantInvitation(tenantID uuid.UUID, email string, roleID, appID *uuid.UUID, invitedBy *uuid.UUID, duration time.Duration) (*TenantInvitation, error) {
 	if email == "" {
-		return nil, errors.New("email is required")
+		return nil, ErrInvitationEmailRequired
 	}
 
 	// Generate secure token (UUID is simple enough for now, or crypto random)
@@ -73,10 +75,10 @@ func (i *TenantInvitation) Accept() error {
 
 func (i *TenantInvitation) Validate() error {
 	if i.Email == "" {
-		return errors.New("email is required")
+		return ErrInvitationEmailRequired
 	}
 	if i.Token == "" {
-		return errors.New("token is required")
+		return ErrInvitationTokenRequired
 	}
 	return nil
 }

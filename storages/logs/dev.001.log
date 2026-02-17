@@ -217,3 +217,19 @@
 {"level":"INFO","time":"2026-02-16T08:47:49.827+0700","caller":"iam/iam.go:64","msg":"IAM module initialized"}
 {"level":"INFO","time":"2026-02-16T08:47:49.828+0700","caller":"apps/apps.go:53","msg":"Apps module initialized"}
 {"level":"INFO","time":"2026-02-16T08:47:49.828+0700","caller":"messaging/messaging.go:40","msg":"Messaging module initialized"}
+{"level":"INFO","time":"2026-02-17T18:47:28.219+0700","caller":"initialize/postgresql.go:31","msg":"Postgresql init success"}
+{"level":"INFO","time":"2026-02-17T18:47:29.216+0700","caller":"initialize/postgresql.go:48","msg":"GORM init success"}
+{"level":"INFO","time":"2026-02-17T18:47:29.219+0700","caller":"iam/iam.go:64","msg":"IAM module initialized"}
+{"level":"INFO","time":"2026-02-17T18:47:29.219+0700","caller":"apps/apps.go:53","msg":"Apps module initialized"}
+{"level":"INFO","time":"2026-02-17T18:47:29.220+0700","caller":"messaging/messaging.go:50","msg":"Messaging module initialized"}
+{"level":"INFO","time":"2026-02-17T18:47:29.220+0700","caller":"worker/sla_worker.go:47","msg":"SLA Worker started"}
+{"level":"INFO","time":"2026-02-17T18:47:29.220+0700","caller":"worker/webhook_retry_worker.go:38","msg":"Webhook Retry Worker started"}
+{"level":"INFO","time":"2026-02-17T18:47:29.221+0700","caller":"worker/workflow_executor.go:53","msg":"WorkflowExecutor: started (polling every 30s)"}
+{"level":"INFO","time":"2026-02-17T22:34:24.453+0700","caller":"initialize/postgresql.go:31","msg":"Postgresql init success"}
+{"level":"INFO","time":"2026-02-17T22:34:26.276+0700","caller":"initialize/postgresql.go:48","msg":"GORM init success"}
+{"level":"INFO","time":"2026-02-17T22:34:26.278+0700","caller":"iam/iam.go:64","msg":"IAM module initialized"}
+{"level":"INFO","time":"2026-02-17T22:34:26.279+0700","caller":"apps/apps.go:53","msg":"Apps module initialized"}
+{"level":"INFO","time":"2026-02-17T22:34:26.279+0700","caller":"messaging/messaging.go:50","msg":"Messaging module initialized"}
+{"level":"INFO","time":"2026-02-17T22:34:26.279+0700","caller":"worker/sla_worker.go:47","msg":"SLA Worker started"}
+{"level":"INFO","time":"2026-02-17T22:34:26.280+0700","caller":"worker/webhook_retry_worker.go:38","msg":"Webhook Retry Worker started"}
+{"level":"INFO","time":"2026-02-17T22:34:26.280+0700","caller":"worker/workflow_executor.go:53","msg":"WorkflowExecutor: started (polling every 30s)"}

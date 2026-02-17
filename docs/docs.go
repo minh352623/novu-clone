@@ -374,6 +374,68 @@ const docTemplate = `{
                 }
             }
         },
+        "/apps/{app_id}/environments/{env_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update rate limit and SLA settings for an environment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "Update environment configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "App ID",
+                        "name": "app_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "env_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Config update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.UpdateEnvironmentConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.EnvironmentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/apps/{app_id}/metrics": {
             "get": {
                 "security": [
@@ -411,6 +473,90 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "integer"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/apps/{app_id}/metrics/detailed": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "Get detailed usage metrics for an app",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "App ID",
+                        "name": "app_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Days to look back (default: 30)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.DetailedMetricsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/apps/{app_id}/metrics/timeseries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Apps"
+                ],
+                "summary": "Get daily time-series metrics for an app",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "App ID",
+                        "name": "app_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Days to look back (default: 30)",
+                        "name": "days",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Optional environment filter",
+                        "name": "environment_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.TimeSeriesResponse"
                         }
                     }
                 }
@@ -1151,7 +1297,7 @@ const docTemplate = `{
         },
         "/conversations/ws": {
             "get": {
-                "description": "Connect to WebSocket for real-time updates",
+                "description": "Connect to WebSocket for real-time messaging updates (requires auth)",
                 "tags": [
                     "Messaging"
                 ],
@@ -1245,6 +1391,64 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK"
+                    }
+                }
+            }
+        },
+        "/conversations/{id}/audit-trail": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetch paginated history of assignments and resolutions",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Get Conversation Audit Trail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter from date (RFC3339)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter to date (RFC3339)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.AuditTrailResponse"
+                        }
                     }
                 }
             }
@@ -1493,6 +1697,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/dashboards/health": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get operational health overview: queue state, SLA compliance, webhook reliability",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System Health"
+                ],
+                "summary": "Get System Health Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_health_dto.SystemHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/dashboards/partner": {
             "get": {
                 "security": [
@@ -1540,6 +1790,58 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.PartnerDashboardResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboards/personal": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get comprehensive metrics and activity for the current agent",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get Personal Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "SLA Threshold override (seconds)",
+                        "name": "sla_threshold",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.PersonalDashboardResponse"
                         }
                     }
                 }
@@ -2141,6 +2443,154 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.NotificationResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/templates/{id}/content": {
+            "post": {
+                "description": "Add content (subject, body) in a new language for a template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Templates"
+                ],
+                "summary": "Add template content for a new language",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Content data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.CreateTemplateContentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.TemplateContentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/templates/{id}/content/{lang}": {
+            "put": {
+                "description": "Update subject and body for a specific language",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Templates"
+                ],
+                "summary": "Update template content for a language",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Language Code",
+                        "name": "lang",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Content update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/templates/{id}/languages": {
+            "get": {
+                "description": "Returns all language codes with content for a template",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Templates"
+                ],
+                "summary": "List available languages for a template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -3869,6 +4319,339 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/workflows": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "List workflows by environment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Create a new workflow",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Environment ID",
+                        "name": "environment_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Workflow data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.CreateWorkflowRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/workflows/trigger": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Trigger a workflow execution",
+                "parameters": [
+                    {
+                        "description": "Trigger data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.TriggerWorkflowRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/workflows/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Get workflow by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Delete a workflow",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            },
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Update a workflow",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.UpdateWorkflowRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/workflows/{id}/steps": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Add a step to a workflow",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Step data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.CreateStepRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.StepResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/workflows/{id}/steps/{stepId}": {
+            "delete": {
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Delete a workflow step",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Step ID",
+                        "name": "stepId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            },
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Update a workflow step",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Step ID",
+                        "name": "stepId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.UpdateStepRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.StepResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/workflows/{id}/toggle": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workflows"
+                ],
+                "summary": "Toggle workflow active state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.WorkflowResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -3949,6 +4732,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "sla_threshold_seconds": {
+                    "type": "integer"
+                },
                 "tenant_id": {
                     "type": "string"
                 },
@@ -3968,6 +4754,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "sla_threshold_seconds": {
+                    "type": "integer"
                 }
             }
         },
@@ -3979,6 +4768,9 @@ const docTemplate = `{
             "properties": {
                 "code": {
                     "type": "string"
+                },
+                "sla_threshold_seconds": {
+                    "type": "integer"
                 }
             }
         },
@@ -4024,8 +4816,67 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "max_retries": {
+                    "type": "integer"
+                },
+                "retry_backoff_seconds": {
+                    "type": "integer"
+                },
+                "retry_timeout_seconds": {
+                    "type": "integer"
+                },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.DailyMetricDTO": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "inbound": {
+                    "type": "integer"
+                },
+                "outbound": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.DetailedMetricsResponse": {
+            "type": "object",
+            "properties": {
+                "by_provider": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.ProviderMetricDTO"
+                    }
+                },
+                "failure_count": {
+                    "type": "integer"
+                },
+                "inbound_messages": {
+                    "type": "integer"
+                },
+                "outbound_messages": {
+                    "type": "integer"
+                },
+                "success_count": {
+                    "type": "integer"
+                },
+                "success_rate": {
+                    "description": "percentage",
+                    "type": "number"
+                },
+                "total_messages": {
+                    "type": "integer"
                 }
             }
         },
@@ -4049,6 +4900,29 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.APIKeyResponse"
                     }
+                },
+                "rate_limit_daily": {
+                    "type": "integer"
+                },
+                "rate_limit_rpm": {
+                    "type": "integer"
+                },
+                "sla_threshold_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.ProviderMetricDTO": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -4110,6 +4984,17 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_apps_controller_dto.TimeSeriesResponse": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_apps_controller_dto.DailyMetricDTO"
+                    }
+                }
+            }
+        },
         "CONVERDA_internal_apps_controller_dto.UpdateAppRequest": {
             "type": "object",
             "properties": {
@@ -4118,6 +5003,23 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "sla_threshold_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_apps_controller_dto.UpdateEnvironmentConfigRequest": {
+            "type": "object",
+            "properties": {
+                "rate_limit_daily": {
+                    "type": "integer"
+                },
+                "rate_limit_rpm": {
+                    "type": "integer"
+                },
+                "sla_threshold_seconds": {
+                    "type": "integer"
                 }
             }
         },
@@ -4151,6 +5053,15 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
+                "max_retries": {
+                    "type": "integer"
+                },
+                "retry_backoff_seconds": {
+                    "type": "integer"
+                },
+                "retry_timeout_seconds": {
+                    "type": "integer"
+                },
                 "url": {
                     "type": "string"
                 }
@@ -4183,6 +5094,15 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
+                "max_retries": {
+                    "type": "integer"
+                },
+                "retry_backoff_seconds": {
+                    "type": "integer"
+                },
+                "retry_timeout_seconds": {
+                    "type": "integer"
+                },
                 "secret": {
                     "type": "string"
                 },
@@ -4191,6 +5111,80 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_health_dto.QueueHealth": {
+            "type": "object",
+            "properties": {
+                "assigned_count": {
+                    "type": "integer"
+                },
+                "avg_wait_time_seconds": {
+                    "type": "number"
+                },
+                "overdue_count": {
+                    "type": "integer"
+                },
+                "total_active": {
+                    "type": "integer"
+                },
+                "unassigned_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_health_dto.SLACompliance": {
+            "type": "object",
+            "properties": {
+                "breached": {
+                    "type": "integer"
+                },
+                "compliance_rate_percent": {
+                    "type": "number"
+                },
+                "total_resolved": {
+                    "type": "integer"
+                },
+                "within_sla": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CONVERDA_internal_health_dto.SystemHealthResponse": {
+            "type": "object",
+            "properties": {
+                "generated_at": {
+                    "type": "string"
+                },
+                "queue_health": {
+                    "$ref": "#/definitions/CONVERDA_internal_health_dto.QueueHealth"
+                },
+                "sla_compliance": {
+                    "$ref": "#/definitions/CONVERDA_internal_health_dto.SLACompliance"
+                },
+                "webhook_health": {
+                    "$ref": "#/definitions/CONVERDA_internal_health_dto.WebhookHealth"
+                }
+            }
+        },
+        "CONVERDA_internal_health_dto.WebhookHealth": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer"
+                },
+                "pending_retries": {
+                    "type": "integer"
+                },
+                "success_count": {
+                    "type": "integer"
+                },
+                "success_rate_percent": {
+                    "type": "number"
+                },
+                "total_dispatched": {
+                    "type": "integer"
                 }
             }
         },
@@ -4608,6 +5602,17 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_messaging_controller_dto.ActivityPoint": {
+            "type": "object",
+            "properties": {
+                "time": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
         "CONVERDA_internal_messaging_controller_dto.AddParticipantsRequest": {
             "type": "object",
             "required": [
@@ -4657,6 +5662,55 @@ const docTemplate = `{
                 "member_id": {
                     "description": "Optional, if empty assigns to caller",
                     "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.AssignmentLogResponse": {
+            "type": "object",
+            "properties": {
+                "assigned_at": {
+                    "type": "string"
+                },
+                "assigned_to_display_name": {
+                    "type": "string"
+                },
+                "assigned_to_member_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "response_time_seconds": {
+                    "type": "integer"
+                },
+                "thread_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_messaging_controller_dto.AuditTrailResponse": {
+            "type": "object",
+            "properties": {
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.AssignmentLogResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "thread_id": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -4834,6 +5888,29 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_messaging_controller_dto.PersonalDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "activity_timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_messaging_controller_dto.ActivityPoint"
+                    }
+                },
+                "stats": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.AgentStats"
+                },
+                "team_comparison": {
+                    "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.TeamStats"
+                },
+                "top_performers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_messaging_domain_model_entity.AgentStats"
+                    }
+                }
+            }
+        },
         "CONVERDA_internal_messaging_controller_dto.ReplyMessageRequest": {
             "type": "object",
             "required": [
@@ -4980,6 +6057,23 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse": {
+            "type": "object",
+            "properties": {
+                "languages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "template_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "CONVERDA_internal_notification_controller_dto.CreateGroupRequest": {
             "type": "object",
             "required": [
@@ -5023,6 +6117,32 @@ const docTemplate = `{
                 "variables_schema": {
                     "type": "object",
                     "additionalProperties": true
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.CreateTemplateContentRequest": {
+            "type": "object",
+            "required": [
+                "language_code"
+            ],
+            "properties": {
+                "body_html": {
+                    "type": "string"
+                },
+                "body_push": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "body_text": {
+                    "type": "string"
+                },
+                "language_code": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
                 }
             }
         },
@@ -5141,6 +6261,35 @@ const docTemplate = `{
                 }
             }
         },
+        "CONVERDA_internal_notification_controller_dto.TemplateContentResponse": {
+            "type": "object",
+            "properties": {
+                "body_html": {
+                    "type": "string"
+                },
+                "body_text": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "language_code": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "template_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "CONVERDA_internal_notification_controller_dto.UpdateGroupRequest": {
             "type": "object",
             "properties": {
@@ -5170,6 +6319,26 @@ const docTemplate = `{
                 "variables_schema": {
                     "type": "object",
                     "additionalProperties": true
+                }
+            }
+        },
+        "CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest": {
+            "type": "object",
+            "properties": {
+                "body_html": {
+                    "type": "string"
+                },
+                "body_push": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "body_text": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
                 }
             }
         },
@@ -5235,6 +6404,155 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.CreateStepRequest": {
+            "type": "object",
+            "required": [
+                "step_type"
+            ],
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "parent_step_id": {
+                    "type": "string"
+                },
+                "step_type": {
+                    "type": "string",
+                    "enum": [
+                        "channel",
+                        "delay",
+                        "digest"
+                    ]
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.CreateWorkflowRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "trigger_identifier"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "trigger_identifier": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.StepResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "parent_step_id": {
+                    "type": "string"
+                },
+                "step_type": {
+                    "type": "string"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.TriggerWorkflowRequest": {
+            "type": "object",
+            "required": [
+                "environment_id",
+                "subscriber_key",
+                "trigger_identifier"
+            ],
+            "properties": {
+                "environment_id": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "subscriber_key": {
+                    "type": "string"
+                },
+                "trigger_identifier": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.UpdateStepRequest": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "step_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.UpdateWorkflowRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "trigger_identifier": {
+                    "type": "string"
+                }
+            }
+        },
+        "CONVERDA_internal_workflow_controller_dto.WorkflowResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "environment_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CONVERDA_internal_workflow_controller_dto.StepResponse"
+                    }
+                },
+                "trigger_identifier": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }

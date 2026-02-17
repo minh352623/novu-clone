@@ -86,4 +86,5 @@ type SESSetting struct {
 	AccessKeyId     string `mapstructure:"access_key_id"`
 	SecretAccessKey string `mapstructure:"secret_access_key"`
 	FromEmail       string `mapstructure:"from_email"`
+	InviteBaseURL   string `mapstructure:"invite_base_url"`
 }

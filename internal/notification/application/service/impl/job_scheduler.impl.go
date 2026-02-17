@@ -2,8 +2,10 @@ package impl
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
+
+	domain "CONVERDA/internal/notification/domain"
 
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/domain/entity"
@@ -52,7 +54,7 @@ func (s *jobScheduler) ScheduleJob(ctx context.Context, envID uuid.UUID, tenantI
 	}
 
 	if err := s.repo.Create(ctx, job); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
 	return job, nil
 }
@@ -60,17 +62,17 @@ func (s *jobScheduler) ScheduleJob(ctx context.Context, envID uuid.UUID, tenantI
 func (s *jobScheduler) CancelJob(ctx context.Context, envID uuid.UUID, id uuid.UUID) error {
 	job, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch job %s: %w", id, err)
 	}
 	if job == nil {
 		return nil
 	}
 	if job.EnvironmentID != envID {
-		return errors.New("job not found in this environment")
+		return domain.ErrJobNotInEnv
 	}
 
 	if job.Status == entity.JobStatusCompleted || job.Status == entity.JobStatusFailed || job.Status == entity.JobStatusCancelled {
-		return errors.New("cannot cancel finished job")
+		return domain.ErrJobNotCancellable
 	}
 
 	job.Status = entity.JobStatusCancelled
@@ -81,7 +83,7 @@ func (s *jobScheduler) CancelJob(ctx context.Context, envID uuid.UUID, id uuid.U
 func (s *jobScheduler) GetJob(ctx context.Context, envID uuid.UUID, id uuid.UUID) (*entity.NotificationJob, error) {
 	job, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch job %s: %w", id, err)
 	}
 	if job != nil && job.EnvironmentID != envID {
 		return nil, nil
@@ -90,21 +92,25 @@ func (s *jobScheduler) GetJob(ctx context.Context, envID uuid.UUID, id uuid.UUID
 }
 
 func (s *jobScheduler) ListJobs(ctx context.Context, envID uuid.UUID, limit, offset int) ([]*entity.NotificationJob, int64, error) {
-	return s.repo.List(ctx, envID, limit, offset)
+	jobs, total, err := s.repo.List(ctx, envID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list notification jobs: %w", err)
+	}
+	return jobs, total, nil
 }
 
 func (s *jobScheduler) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 	// This should ideally run in background or handle context timeout
 	job, err := s.repo.GetByID(ctx, jobID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch job %s: %w", jobID, err)
 	}
 	if job == nil {
-		return errors.New("job not found")
+		return domain.ErrJobNotFound
 	}
 
 	if job.Status != entity.JobStatusPending && job.Status != entity.JobStatusScheduled {
-		return errors.New("job is not pending")
+		return domain.ErrJobNotPending
 	}
 
 	// Fetch Template Code
@@ -112,7 +118,7 @@ func (s *jobScheduler) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 	if job.TemplateID != nil {
 		tmpl, err := s.tmplManager.GetTemplate(ctx, job.EnvironmentID, *job.TemplateID)
 		if err != nil {
-			return err // Or mark job as failed
+			return fmt.Errorf("failed to fetch template: %w", err)
 		}
 		if tmpl != nil {
 			templateCode = tmpl.Code
@@ -125,14 +131,14 @@ func (s *jobScheduler) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 	}
 
 	if templateCode == "" {
-		return errors.New("template code not found")
+		return domain.ErrTemplateCodeMissing
 	}
 
 	now := time.Now()
 	job.StartedAt = &now
 	job.Status = entity.JobStatusProcessing
 	if err := s.repo.Update(ctx, job); err != nil {
-		return err
+		return fmt.Errorf("failed to update job status: %w", err)
 	}
 
 	recipientsList, ok := job.RecipientsData["recipients"].([]interface{})

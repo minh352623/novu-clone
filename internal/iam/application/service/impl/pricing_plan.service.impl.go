@@ -25,7 +25,10 @@ func NewPricingPlanService(planRepo repository.PricingPlanRepository) service.Pr
 
 func (s *pricingPlanServiceImpl) CreatePricingPlan(ctx context.Context, name, slug string, monthlyCredits int64, price float64, currency string) (*entity.PricingPlan, error) {
 	// Check if slug exists
-	existing, _ := s.planRepo.GetBySlug(ctx, slug)
+	existing, err := s.planRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing plan slug: %w", err)
+	}
 	if existing != nil {
 		return nil, fmt.Errorf("pricing plan with slug '%s' already exists", slug)
 	}
@@ -86,18 +89,24 @@ func (s *pricingPlanServiceImpl) ListPricingPlans(ctx context.Context, filters r
 }
 
 func (s *pricingPlanServiceImpl) UpdatePricingPlan(ctx context.Context, plan *entity.PricingPlan) error {
-	return s.planRepo.Update(ctx, plan)
+	if err := s.planRepo.Update(ctx, plan); err != nil {
+		return fmt.Errorf("failed to update pricing plan %s: %w", plan.ID, err)
+	}
+	return nil
 }
 
 func (s *pricingPlanServiceImpl) DeletePricingPlan(ctx context.Context, id uuid.UUID) error {
-	return s.planRepo.Delete(ctx, id)
+	if err := s.planRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete pricing plan %s: %w", id, err)
+	}
+	return nil
 }
 
 func (s *pricingPlanServiceImpl) SetAsDefault(ctx context.Context, id uuid.UUID) error {
 	// Verify it exists
 	plan, err := s.planRepo.GetByID(ctx, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get pricing plan: %w", err)
 	}
 	if plan == nil {
 		return service.ErrPlanNotFound

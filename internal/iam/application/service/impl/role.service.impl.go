@@ -25,7 +25,10 @@ func NewRoleService(roleRepo repository.RoleRepository) service.RoleService {
 
 func (s *roleServiceImpl) CreateRole(ctx context.Context, name, slug string, permissions map[string]interface{}) (*entity.Role, error) {
 	// Check if slug exists
-	existing, _ := s.roleRepo.GetBySlug(ctx, slug)
+	existing, err := s.roleRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing role slug: %w", err)
+	}
 	if existing != nil {
 		return nil, fmt.Errorf("role with slug '%s' already exists", slug)
 	}
@@ -79,13 +82,22 @@ func (s *roleServiceImpl) UpdateRole(ctx context.Context, role *entity.Role) err
 	if err := role.Validate(); err != nil {
 		return err
 	}
-	return s.roleRepo.Update(ctx, role)
+	if err := s.roleRepo.Update(ctx, role); err != nil {
+		return fmt.Errorf("failed to update role %s: %w", role.ID, err)
+	}
+	return nil
 }
 
 func (s *roleServiceImpl) DeleteRole(ctx context.Context, id uuid.UUID) error {
-	return s.roleRepo.Delete(ctx, id)
+	if err := s.roleRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete role %s: %w", id, err)
+	}
+	return nil
 }
 
 func (s *roleServiceImpl) UpdatePermissions(ctx context.Context, roleID uuid.UUID, permissions map[string]interface{}) error {
-	return s.roleRepo.UpdatePermissions(ctx, roleID, permissions)
+	if err := s.roleRepo.UpdatePermissions(ctx, roleID, permissions); err != nil {
+		return fmt.Errorf("failed to update permissions for role %s: %w", roleID, err)
+	}
+	return nil
 }

@@ -94,7 +94,7 @@ func (r *messageRepository) GetMessagesByThread(ctx context.Context, threadID uu
 		return nil, err
 	}
 
-	var entities []*entity.Message
+	entities := make([]*entity.Message, 0, len(models))
 	for _, m := range models {
 		content, _ := m.Content.MarshalJSON()
 		entities = append(entities, &entity.Message{
@@ -125,7 +125,7 @@ func (r *messageRepository) ListByThread(ctx context.Context, threadID uuid.UUID
 		return nil, err
 	}
 
-	var entities []*entity.Message
+	entities := make([]*entity.Message, 0, len(models))
 	for _, m := range models {
 		content, _ := m.Content.MarshalJSON()
 		entities = append(entities, &entity.Message{
@@ -169,7 +169,7 @@ func (r *messageRepository) ListByCursor(ctx context.Context, threadID uuid.UUID
 		return nil, err
 	}
 
-	var entities []*entity.Message
+	entities := make([]*entity.Message, 0, len(models))
 	for _, m := range models {
 		content, _ := m.Content.MarshalJSON()
 		entities = append(entities, &entity.Message{

@@ -33,7 +33,7 @@ func InitIAMModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 
 	authService := impl.NewAuthService(userRepo)
 	tenantService := impl.NewTenantService(tenantRepo, memberRepo, roleRepo, pricingPlanRepo)
-	memberService := impl.NewMemberService(memberRepo, roleRepo, tenantRepo, invitationRepo, emailService)
+	memberService := impl.NewMemberService(memberRepo, roleRepo, tenantRepo, invitationRepo, userRepo, emailService)
 	roleService := impl.NewRoleService(roleRepo)
 	pricingPlanService := impl.NewPricingPlanService(pricingPlanRepo)
 	tokenService := impl.NewTokenService()

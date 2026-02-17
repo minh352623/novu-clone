@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
 	"CONVERDA/internal/notification/infrastructure/provider"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type notificationServiceImpl struct {
@@ -60,7 +62,10 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	}
 
 	// 3. Create Notification Record (Pending)
-	dataBytes, _ := json.Marshal(req.Data)
+	dataBytes, err := json.Marshal(req.Data)
+	if err != nil {
+		global.Logger.Warn("notification_service: failed to marshal notification data", zap.Error(err))
+	}
 	notif := entity.NewNotification(tenantID, envID, req.TemplateCode, req.Recipient, req.Channel, dataBytes)
 
 	if err := s.notifRepo.Create(ctx, notif); err != nil {
@@ -89,9 +94,7 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	notif.UpdatedAt = now
 
 	if err := s.notifRepo.Update(ctx, notif); err != nil {
-		// Log error but don't fail the request if dispatch succeeded?
-		// Ideally we should return error or alert.
-		fmt.Printf("Failed to update notification status: %v\n", err)
+		global.Logger.Error("notification_service: failed to update notification status", zap.String("notificationID", notif.ID.String()), zap.Error(err))
 	}
 
 	if dispatchErr != nil {

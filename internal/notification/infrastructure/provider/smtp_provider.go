@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/smtp"
 )
 
@@ -70,51 +71,49 @@ func (p *SmtpProvider) sendWithSSL(addr string, auth smtp.Auth, from string, to 
 
 	conn, err := tls.Dial("tcp", addr, tlsconfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("smtp ssl: failed to dial: %w", err)
 	}
 	defer conn.Close()
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
-		return err
+		return fmt.Errorf("smtp ssl: failed to create client: %w", err)
 	}
 	defer client.Quit()
 
 	if auth != nil {
 		if err = client.Auth(auth); err != nil {
-			return err
+			return fmt.Errorf("smtp ssl: auth failed: %w", err)
 		}
 	}
 
 	if err = client.Mail(from); err != nil {
-		return err
+		return fmt.Errorf("smtp ssl: MAIL FROM failed: %w", err)
 	}
 	for _, addr := range to {
 		if err = client.Rcpt(addr); err != nil {
-			return err
+			return fmt.Errorf("smtp ssl: RCPT TO failed: %w", err)
 		}
 	}
 
 	w, err := client.Data()
 	if err != nil {
-		return err
+		return fmt.Errorf("smtp ssl: DATA command failed: %w", err)
 	}
 
 	_, err = w.Write(msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("smtp ssl: failed to write message: %w", err)
 	}
 
 	err = w.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("smtp ssl: failed to close writer: %w", err)
 	}
 
 	return client.Quit()
 }
 
 func netSplitHostPort(addr string) (string, string, error) {
-	// Simple helper to avoid importing net in every file if not needed
-	// but we need it for tls. Using net.SplitHostPort is better.
-	return "localhost", "465", nil // Placeholder, will fix below
+	return net.SplitHostPort(addr)
 }

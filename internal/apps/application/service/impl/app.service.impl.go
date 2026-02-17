@@ -3,6 +3,8 @@ package impl
 import (
 	"context"
 	"fmt"
+
+	"CONVERDA/global"
 	"time"
 
 	"CONVERDA/internal/apps/application/service"
@@ -10,6 +12,7 @@ import (
 	"CONVERDA/internal/apps/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type appServiceImpl struct {
@@ -54,36 +57,50 @@ func (s *appServiceImpl) CreateApp(ctx context.Context, tenantID uuid.UUID, name
 			}
 			createdEnv, err := s.envRepo.Create(ctx, env)
 			if err != nil {
-				fmt.Printf("Warning: failed to auto-create environment %s: %v\n", se.Code, err)
+				global.Logger.Warn("auto-provisioning: failed to create environment", zap.String("code", se.Code), zap.Error(err))
 				continue
 			}
 
 			// Auto-generate default API Key for the environment
 			_, _, err = s.apiKeyServ.GenerateKey(ctx, createdEnv.ID, "Default Key")
 			if err != nil {
-				fmt.Printf("Warning: failed to auto-generate default API Key for environment %s: %v\n", se.Code, err)
+				global.Logger.Warn("auto-provisioning: failed to generate API key", zap.String("code", se.Code), zap.Error(err))
 			}
 		}
 	} else {
-		fmt.Printf("Warning: failed to fetch system environments for auto-provisioning: %v\n", err)
+		global.Logger.Warn("auto-provisioning: failed to fetch system environments", zap.Error(err))
 	}
 
 	return createdApp, nil
 }
 
 func (s *appServiceImpl) GetApp(ctx context.Context, appID uuid.UUID) (*entity.App, error) {
-	return s.appRepo.GetByID(ctx, appID)
+	app, err := s.appRepo.GetByID(ctx, appID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get app by id %s: %w", appID, err)
+	}
+	return app, nil
 }
 
 func (s *appServiceImpl) ListApps(ctx context.Context, tenantID uuid.UUID) ([]*entity.App, error) {
-	return s.appRepo.ListByTenant(ctx, tenantID)
+	apps, err := s.appRepo.ListByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list apps for tenant %s: %w", tenantID, err)
+	}
+	return apps, nil
 }
 
 func (s *appServiceImpl) UpdateApp(ctx context.Context, app *entity.App) error {
 	app.UpdatedAt = time.Now()
-	return s.appRepo.Update(ctx, app)
+	if err := s.appRepo.Update(ctx, app); err != nil {
+		return fmt.Errorf("failed to update app %s: %w", app.ID, err)
+	}
+	return nil
 }
 
 func (s *appServiceImpl) DeleteApp(ctx context.Context, appID uuid.UUID) error {
-	return s.appRepo.Delete(ctx, appID)
+	if err := s.appRepo.Delete(ctx, appID); err != nil {
+		return fmt.Errorf("failed to delete app %s: %w", appID, err)
+	}
+	return nil
 }

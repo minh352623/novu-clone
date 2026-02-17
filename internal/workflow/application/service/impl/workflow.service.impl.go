@@ -2,6 +2,7 @@ package impl
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"CONVERDA/internal/workflow/controller/dto"
@@ -31,7 +32,7 @@ func (s *workflowServiceImpl) CreateWorkflow(ctx context.Context, envID uuid.UUI
 	}
 
 	if err := s.workflowRepo.Create(ctx, wf); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create workflow: %w", err)
 	}
 
 	return dto.ToWorkflowResponse(wf), nil
@@ -40,7 +41,7 @@ func (s *workflowServiceImpl) CreateWorkflow(ctx context.Context, envID uuid.UUI
 func (s *workflowServiceImpl) GetWorkflow(ctx context.Context, id uuid.UUID) (*dto.WorkflowResponse, error) {
 	wf, err := s.workflowRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get workflow %s: %w", id, err)
 	}
 	return dto.ToWorkflowResponse(wf), nil
 }
@@ -48,7 +49,7 @@ func (s *workflowServiceImpl) GetWorkflow(ctx context.Context, id uuid.UUID) (*d
 func (s *workflowServiceImpl) ListWorkflows(ctx context.Context, envID uuid.UUID) ([]*dto.WorkflowResponse, error) {
 	workflows, err := s.workflowRepo.ListByEnvironment(ctx, envID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list workflows for env %s: %w", envID, err)
 	}
 	return dto.ToWorkflowResponseList(workflows), nil
 }
@@ -56,7 +57,7 @@ func (s *workflowServiceImpl) ListWorkflows(ctx context.Context, envID uuid.UUID
 func (s *workflowServiceImpl) UpdateWorkflow(ctx context.Context, id uuid.UUID, req dto.UpdateWorkflowRequest) (*dto.WorkflowResponse, error) {
 	wf, err := s.workflowRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get workflow %s for update: %w", id, err)
 	}
 
 	if req.Name != nil {
@@ -68,27 +69,30 @@ func (s *workflowServiceImpl) UpdateWorkflow(ctx context.Context, id uuid.UUID, 
 	wf.UpdatedAt = time.Now()
 
 	if err := s.workflowRepo.Update(ctx, wf); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to update workflow %s: %w", id, err)
 	}
 
 	return dto.ToWorkflowResponse(wf), nil
 }
 
 func (s *workflowServiceImpl) DeleteWorkflow(ctx context.Context, id uuid.UUID) error {
-	return s.workflowRepo.Delete(ctx, id)
+	if err := s.workflowRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete workflow %s: %w", id, err)
+	}
+	return nil
 }
 
 func (s *workflowServiceImpl) ToggleWorkflow(ctx context.Context, id uuid.UUID) (*dto.WorkflowResponse, error) {
 	wf, err := s.workflowRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get workflow %s for toggle: %w", id, err)
 	}
 
 	wf.IsActive = !wf.IsActive
 	wf.UpdatedAt = time.Now()
 
 	if err := s.workflowRepo.Update(ctx, wf); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to update workflow %s after toggle: %w", id, err)
 	}
 
 	return dto.ToWorkflowResponse(wf), nil
@@ -99,7 +103,7 @@ func (s *workflowServiceImpl) ToggleWorkflow(ctx context.Context, id uuid.UUID) 
 func (s *workflowServiceImpl) AddStep(ctx context.Context, workflowID uuid.UUID, req dto.CreateStepRequest) (*dto.StepResponse, error) {
 	// Verify workflow exists
 	if _, err := s.workflowRepo.GetByID(ctx, workflowID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("workflow %s not found: %w", workflowID, err)
 	}
 
 	step := &entity.WorkflowStep{
@@ -113,7 +117,7 @@ func (s *workflowServiceImpl) AddStep(ctx context.Context, workflowID uuid.UUID,
 	}
 
 	if err := s.workflowRepo.AddStep(ctx, step); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to add step to workflow %s: %w", workflowID, err)
 	}
 
 	resp := dto.ToStepResponse(step)
@@ -138,7 +142,7 @@ func (s *workflowServiceImpl) UpdateStep(ctx context.Context, stepID uuid.UUID, 
 	}
 
 	if err := s.workflowRepo.UpdateStep(ctx, step); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to update step %s: %w", stepID, err)
 	}
 
 	resp := dto.ToStepResponse(step)
@@ -146,5 +150,8 @@ func (s *workflowServiceImpl) UpdateStep(ctx context.Context, stepID uuid.UUID, 
 }
 
 func (s *workflowServiceImpl) DeleteStep(ctx context.Context, stepID uuid.UUID) error {
-	return s.workflowRepo.DeleteStep(ctx, stepID)
+	if err := s.workflowRepo.DeleteStep(ctx, stepID); err != nil {
+		return fmt.Errorf("failed to delete step %s: %w", stepID, err)
+	}
+	return nil
 }

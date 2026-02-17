@@ -7,12 +7,13 @@ import (
 	"encoding/hex" // or base64
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"CONVERDA/global"
 
 	"CONVERDA/pkg/response"
 
@@ -29,7 +30,7 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		requestTimeStr := ctx.GetHeader("X-Request-Time")
 
 		if clientSign == "" || requestTimeStr == "" {
-			log.Println("HMAC Auth: Missing X-Sign or X-Request-Time header")
+			global.Logger.Warn("HMAC Auth: missing X-Sign or X-Request-Time header")
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", "Missing required signature headers"))
 			return
 		}
@@ -37,14 +38,14 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		// 1. Kiểm tra Timestamp
 		requestTime, err := strconv.ParseInt(requestTimeStr, 10, 64)
 		if err != nil {
-			log.Println("HMAC Auth: Invalid request time format")
+			global.Logger.Warn("HMAC Auth: invalid request time format")
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, response.NewAPIError(http.StatusBadRequest, "Invalid request", "Invalid request time format"))
 			return
 		}
 
 		now := time.Now().Unix()
 		if now-requestTime > int64(requestValidityDuration.Seconds()) || now-requestTime < -5 { // Chấp nhận trễ 5s
-			log.Printf("HMAC Auth: Request timestamp out of bounds. Now: %d, ReqTime: %d\n", now, requestTime)
+			global.Logger.Warn("HMAC Auth: request timestamp out of bounds")
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, response.NewAPIError(http.StatusBadRequest, "Invalid request", "Request timestamp out of bounds"))
 			return
 		}
@@ -55,7 +56,7 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		if ctx.Request.Body != nil {
 			bodyBytes, err = io.ReadAll(ctx.Request.Body)
 			if err != nil {
-				log.Println("HMAC Auth: Error reading request body:", err)
+				global.Logger.Error("HMAC Auth: error reading request body: " + err.Error())
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, response.NewAPIError(http.StatusInternalServerError, "Server Error", "Could not read request body"))
 				return
 			}
@@ -64,21 +65,21 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		}
 
 		stringToSign := buildStringToSign(ctx, requestTimeStr, bodyBytes)
-		log.Printf("HMAC Auth: Server StringToSign: [%s]\n", strings.ReplaceAll(stringToSign, "\n", "\\n"))
+		global.Logger.Info("HMAC Auth: server StringToSign: [" + strings.ReplaceAll(stringToSign, "\n", "\\n") + "]")
 
 		// 3. Tính toán HMAC phía server
 		serverSign := calculateHMAC(stringToSign, SHARED_SECRET_KEY)
-		log.Printf("HMAC Auth: ClientSign: %s, ServerSign: %s\n", clientSign, serverSign)
+		global.Logger.Info("HMAC Auth: ClientSign: " + clientSign + ", ServerSign: " + serverSign)
 
 		// 4. So sánh chữ ký
 		// Sử dụng hmac.Equal để so sánh an toàn, chống timing attacks
 		if !hmac.Equal([]byte(clientSign), []byte(serverSign)) {
-			log.Println("HMAC Auth: Invalid signature")
+			global.Logger.Warn("HMAC Auth: invalid signature")
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", "Invalid signature"))
 			return
 		}
 
-		log.Println("HMAC Auth: Signature verified successfully")
+		global.Logger.Info("HMAC Auth: signature verified successfully")
 		ctx.Next()
 	}
 }

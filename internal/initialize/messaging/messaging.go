@@ -8,6 +8,7 @@ import (
 	"CONVERDA/internal/messaging/application/worker"
 	"CONVERDA/internal/messaging/controller"
 	"CONVERDA/internal/messaging/controller/middleware"
+	"CONVERDA/internal/messaging/infrastructure/adapter"
 	"CONVERDA/internal/messaging/infrastructure/gateway"
 	"CONVERDA/internal/messaging/infrastructure/persistence/repository"
 	"context"
@@ -28,14 +29,18 @@ func InitMessagingModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc
 	appRepo := appsRepo.NewAppRepository(db)
 	envRepo := appsRepo.NewEnvironmentRepository(db)
 
+	// Adapters
+	appReader := adapter.NewLocalAppAdapter(appRepo, envRepo)
+	memberReader := adapter.NewLocalMemberAdapter(memberRepo)
+
 	// Infrastructure
 	hub := gateway.NewHub()
 	go hub.Run()
 
 	// Services
-	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberRepo, appRepo, envRepo, hub)
+	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberReader, appReader, hub)
 
-	slaWorker := worker.NewSLAWorker(threadRepo, logRepo, appRepo, envRepo)
+	slaWorker := worker.NewSLAWorker(threadRepo, logRepo, appReader)
 	go slaWorker.Run(context.Background())
 
 	// Controllers

@@ -1,8 +1,11 @@
 package gateway
 
 import (
-	"log"
+	"encoding/json"
 	"sync"
+	"time"
+
+	"CONVERDA/global"
 
 	"github.com/google/uuid"
 )
@@ -112,7 +115,7 @@ func (h *Hub) BroadcastToUsers(message []byte, userIDs []uuid.UUID) {
 				case client.send <- message:
 				default:
 					// If channel is full, we might want to log or disconnect
-					log.Printf("Failed to send to client %s, buffer full", client.UserID)
+					global.Logger.Warn("ws: buffer full for client " + client.UserID.String())
 				}
 			}
 		}
@@ -129,8 +132,57 @@ func (h *Hub) BroadcastToEnvironment(envID uuid.UUID, message []byte) {
 			select {
 			case client.send <- message:
 			default:
-				log.Printf("Failed to send to client %s in env %s, buffer full", client.UserID, envID)
+				global.Logger.Warn("ws: buffer full for client " + client.UserID.String() + " in env " + envID.String())
 			}
 		}
 	}
+}
+
+// BroadcastToEnvironmentExclude sends a message to all env clients except the excluded one.
+func (h *Hub) BroadcastToEnvironmentExclude(envID uuid.UUID, message []byte, exclude *Client) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if clients, ok := h.envClients[envID]; ok {
+		for client := range clients {
+			if client == exclude {
+				continue
+			}
+			select {
+			case client.send <- message:
+			default:
+				global.Logger.Warn("ws: buffer full for client " + client.UserID.String() + " in env " + envID.String())
+			}
+		}
+	}
+}
+
+// HandleInbound processes a client-to-server event.
+func (h *Hub) HandleInbound(sender *Client, event *WsInboundEvent) {
+	switch event.Type {
+	case EventTypeTypingStart, EventTypeTypingStop:
+		h.handleTyping(sender, event)
+	default:
+		global.Logger.Warn("ws: unknown inbound event type " + string(event.Type) + " from " + sender.UserID.String())
+	}
+}
+
+// handleTyping broadcasts typing indicator events to other clients in the same env.
+func (h *Hub) handleTyping(sender *Client, event *WsInboundEvent) {
+	outbound := map[string]interface{}{
+		"id":        uuid.New().String(),
+		"type":      event.Type,
+		"timestamp": time.Now(),
+		"payload": map[string]interface{}{
+			"user_id":   sender.UserID,
+			"thread_id": event.ThreadID,
+		},
+	}
+
+	data, err := json.Marshal(outbound)
+	if err != nil {
+		return
+	}
+
+	h.BroadcastToEnvironmentExclude(sender.EnvironmentID, data, sender)
 }

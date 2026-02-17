@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+
+	"CONVERDA/global"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
@@ -27,7 +28,7 @@ func NewFcmProvider(configBytes []byte) (PushProvider, error) {
 
 	// For MOCK/Placeholder purpose if JSON is empty or invalid
 	if cfg.ServiceAccountJSON == "" || cfg.ServiceAccountJSON == "{}" {
-		log.Println("[FCM] Using MOCK FCM client (no service account JSON provided)")
+		global.Logger.Warn("FCM: using MOCK client (no service account JSON provided)")
 		return &mockFcmProvider{}, nil
 	}
 
@@ -60,7 +61,7 @@ func (p *fcmProvider) Send(ctx context.Context, to, subject, body string, data m
 		return fmt.Errorf("failed to send fcm message: %w", err)
 	}
 
-	log.Printf("[FCM] Successfully sent push notification: %s", response)
+	global.Logger.Info("FCM: successfully sent push notification: " + response)
 	return nil
 }
 
@@ -68,7 +69,7 @@ func (p *fcmProvider) Send(ctx context.Context, to, subject, body string, data m
 type mockFcmProvider struct{}
 
 func (p *mockFcmProvider) Send(ctx context.Context, to, subject, body string, data map[string]string) error {
-	log.Printf("[FCM-MOCK] Sending push to %s", to)
-	log.Printf("[FCM-MOCK] Title: %s, Body: %s, Data: %v", subject, body, data)
+	global.Logger.Info("FCM-MOCK: sending push to " + to)
+	global.Logger.Info("FCM-MOCK: title=" + subject + " body=" + body)
 	return nil
 }

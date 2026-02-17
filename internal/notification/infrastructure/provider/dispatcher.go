@@ -3,7 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"CONVERDA/global"
 
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
@@ -42,7 +43,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, envID uuid.UUID, channel, rec
 	if err != nil {
 		// Fallback to default or error?
 		// For now, if no config, we log and simulate success (or error)
-		log.Printf("[Dispatcher] No provider config found for %s in env %s: %v", channel, envID, err)
+		global.Logger.Warn("Dispatcher: no provider config for " + channel + " in env " + envID.String() + ": " + err.Error())
 		return fmt.Errorf("provider not configured for channel %s", channel)
 	}
 
@@ -67,7 +68,7 @@ func (d *Dispatcher) sendEmail(ctx context.Context, config *entity.ProviderConfi
 		return fmt.Errorf("failed to init smtp provider: %w", err)
 	}
 
-	log.Printf("[SMTP] Dispatching real email to %s", recipient)
+	global.Logger.Info("SMTP: dispatching email to " + recipient)
 	return p.Send(ctx, recipient, subject, body)
 }
 

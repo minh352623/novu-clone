@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/domain/model/entity"
 	"CONVERDA/internal/iam/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // memberServiceImpl implements MemberService
@@ -18,6 +20,7 @@ type memberServiceImpl struct {
 	roleRepo       repository.RoleRepository
 	tenantRepo     repository.TenantRepository
 	invitationRepo repository.InvitationRepository
+	userRepo       repository.UserRepository
 	emailService   service.EmailService
 }
 
@@ -27,6 +30,7 @@ func NewMemberService(
 	roleRepo repository.RoleRepository,
 	tenantRepo repository.TenantRepository,
 	invitationRepo repository.InvitationRepository,
+	userRepo repository.UserRepository,
 	emailService service.EmailService,
 ) service.MemberService {
 	return &memberServiceImpl{
@@ -34,6 +38,7 @@ func NewMemberService(
 		roleRepo:       roleRepo,
 		tenantRepo:     tenantRepo,
 		invitationRepo: invitationRepo,
+		userRepo:       userRepo,
 		emailService:   emailService,
 	}
 }
@@ -64,11 +69,18 @@ func (s *memberServiceImpl) AddMember(ctx context.Context, tenantID, userID uuid
 }
 
 func (s *memberServiceImpl) RemoveMember(ctx context.Context, memberID uuid.UUID) error {
-	return s.memberRepo.Delete(ctx, memberID)
+	if err := s.memberRepo.Delete(ctx, memberID); err != nil {
+		return fmt.Errorf("failed to delete member %s: %w", memberID, err)
+	}
+	return nil
 }
 
 func (s *memberServiceImpl) GetMembers(ctx context.Context, tenantID uuid.UUID) ([]*entity.TenantMember, error) {
-	return s.memberRepo.GetByTenantID(ctx, tenantID)
+	members, err := s.memberRepo.GetByTenantID(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get members for tenant %s: %w", tenantID, err)
+	}
+	return members, nil
 }
 
 func (s *memberServiceImpl) AssignRole(ctx context.Context, memberID, roleID uuid.UUID) error {
@@ -81,11 +93,17 @@ func (s *memberServiceImpl) AssignRole(ctx context.Context, memberID, roleID uui
 		return service.ErrRoleNotFound
 	}
 
-	return s.memberRepo.AssignRole(ctx, memberID, roleID)
+	if err := s.memberRepo.AssignRole(ctx, memberID, roleID); err != nil {
+		return fmt.Errorf("failed to assign role %s to member %s: %w", roleID, memberID, err)
+	}
+	return nil
 }
 
 func (s *memberServiceImpl) RevokeRole(ctx context.Context, memberID uuid.UUID) error {
-	return s.memberRepo.RemoveRole(ctx, memberID)
+	if err := s.memberRepo.RemoveRole(ctx, memberID); err != nil {
+		return fmt.Errorf("failed to revoke role for member %s: %w", memberID, err)
+	}
+	return nil
 }
 
 func (s *memberServiceImpl) CheckMembership(ctx context.Context, tenantID, userID uuid.UUID) (*entity.TenantMember, error) {
@@ -158,12 +176,26 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 		roleName = "Member"
 	}
 
+	// Resolve inviter display name
+	inviterName := "A team member"
+	inviterUser, err := s.userRepo.GetByID(ctx, invitedBy)
+	if err == nil && inviterUser != nil {
+		if inviterUser.FullName != nil && *inviterUser.FullName != "" {
+			inviterName = *inviterUser.FullName
+		} else {
+			inviterName = inviterUser.Email
+		}
+	}
+
 	go func() {
-		// Use background context for sending email to avoid cancellation if request ends?
-		// But we should probably use a separate context with timeout.
-		// For now using todo/background context.
-		// Ignoring error for async simplicity, but logging would be better.
-		_ = s.emailService.SendInvitation(context.Background(), email, createdInvite.Token, roleName, tenantName)
+		defer func() {
+			if r := recover(); r != nil {
+				global.Logger.Error("member_service: panic recovered in SendInvitation goroutine", zap.Any("panic", r))
+			}
+		}()
+		if err := s.emailService.SendInvitation(context.Background(), email, createdInvite.Token, roleName, tenantName, inviterName); err != nil {
+			global.Logger.Warn("member_service: failed to send invitation email", zap.String("email", email), zap.Error(err))
+		}
 	}()
 
 	return createdInvite, nil
@@ -173,7 +205,7 @@ func (s *memberServiceImpl) AcceptInvitation(ctx context.Context, token string, 
 	// 1. Get Invitation
 	invitation, err := s.invitationRepo.GetByToken(ctx, token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get invitation by token: %w", err)
 	}
 	if invitation == nil {
 		return nil, entity.ErrInvalidToken
@@ -205,12 +237,16 @@ func (s *memberServiceImpl) AcceptInvitation(ctx context.Context, token string, 
 
 	// 5. Update Invitation Status
 	if err := s.invitationRepo.Update(ctx, invitation); err != nil {
-		// Log error? Transaction would be better.
+		global.Logger.Error("member_service: failed to update invitation status", zap.String("token", token), zap.Error(err))
 	}
 
 	return createdMember, nil
 }
 
 func (s *memberServiceImpl) GetInvitation(ctx context.Context, token string) (*entity.TenantInvitation, error) {
-	return s.invitationRepo.GetByToken(ctx, token)
+	invite, err := s.invitationRepo.GetByToken(ctx, token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get invitation: %w", err)
+	}
+	return invite, nil
 }
