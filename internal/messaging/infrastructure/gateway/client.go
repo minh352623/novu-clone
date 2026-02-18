@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 const (
@@ -65,7 +66,7 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				global.Logger.Warn("ws: unexpected close error: " + err.Error())
+				global.Logger.Warn("ws: unexpected close error", zap.Error(err))
 			}
 			break
 		}
@@ -73,7 +74,7 @@ func (c *Client) readPump() {
 		// Parse inbound event and forward to hub for processing
 		var event WsInboundEvent
 		if err := json.Unmarshal(message, &event); err != nil {
-			global.Logger.Warn("ws: invalid inbound message from " + c.UserID.String() + ": " + err.Error())
+			global.Logger.Warn("ws: invalid inbound message", zap.String("userID", c.UserID.String()), zap.Error(err))
 			continue
 		}
 
@@ -126,7 +127,7 @@ func (c *Client) writePump() {
 func ServeWs(hub *Hub, c *gin.Context, userID uuid.UUID, envID uuid.UUID) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		global.Logger.Error("ws: failed to upgrade connection: " + err.Error())
+		global.Logger.Error("ws: failed to upgrade connection", zap.Error(err))
 		return
 	}
 	client := &Client{Hub: hub, conn: conn, send: make(chan []byte, 256), UserID: userID, EnvironmentID: envID}

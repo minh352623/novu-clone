@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"CONVERDA/internal/messaging/domain/model/entity"
@@ -36,7 +37,7 @@ func (r *subscriberRepository) Create(ctx context.Context, sub *entity.Subscribe
 		UpdatedAt:     sub.UpdatedAt,
 	}
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create subscriber: %w", err)
 	}
 	return sub, nil
 }
@@ -44,7 +45,7 @@ func (r *subscriberRepository) Create(ctx context.Context, sub *entity.Subscribe
 func (r *subscriberRepository) GetByKey(ctx context.Context, envID uuid.UUID, key string) (*entity.Subscriber, error) {
 	var m model.SubscriberModel
 	if err := r.db.WithContext(ctx).Where("environment_id = ? AND subscriber_key = ?", envID, key).First(&m).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get subscriber by key: %w", err)
 	}
 	data, _ := m.Data.MarshalJSON()
 	return &entity.Subscriber{
@@ -69,7 +70,10 @@ func (r *subscriberRepository) Update(ctx context.Context, sub *entity.Subscribe
 		Data:          datatypes.JSON(sub.Data),
 		UpdatedAt:     time.Now(),
 	}
-	return r.db.WithContext(ctx).Model(m).Updates(m).Error
+	if err := r.db.WithContext(ctx).Model(m).Updates(m).Error; err != nil {
+		return fmt.Errorf("failed to update subscriber: %w", err)
+	}
+	return nil
 }
 
 // --- THREAD REPO IMPL ---
@@ -95,7 +99,7 @@ func (r *threadRepository) Create(ctx context.Context, thread *entity.Thread) (*
 		UpdatedAt:     thread.UpdatedAt,
 	}
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create thread: %w", err)
 	}
 	return thread, nil
 }
@@ -103,7 +107,7 @@ func (r *threadRepository) Create(ctx context.Context, thread *entity.Thread) (*
 func (r *threadRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.Thread, error) {
 	var m model.ThreadModel
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get thread by id: %w", err)
 	}
 	return &entity.Thread{
 		ID:            m.ID,
@@ -122,7 +126,7 @@ func (r *threadRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.T
 func (r *threadRepository) GetByIDAndEnv(ctx context.Context, id, envID uuid.UUID) (*entity.Thread, error) {
 	var m model.ThreadModel
 	if err := r.db.WithContext(ctx).Where("id = ? AND environment_id = ?", id, envID).First(&m).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get thread by id and environment: %w", err)
 	}
 	return &entity.Thread{
 		ID:            m.ID,
@@ -149,7 +153,10 @@ func (r *threadRepository) Update(ctx context.Context, thread *entity.Thread) er
 		IsOverdue:     thread.IsOverdue,
 		UpdatedAt:     time.Now(),
 	}
-	return r.db.WithContext(ctx).Model(m).Updates(m).Error
+	if err := r.db.WithContext(ctx).Model(m).Updates(m).Error; err != nil {
+		return fmt.Errorf("failed to update thread: %w", err)
+	}
+	return nil
 }
 
 func (r *threadRepository) List(ctx context.Context, filter domainRepo.ThreadFilter) ([]*entity.Thread, int64, error) {
@@ -177,7 +184,7 @@ func (r *threadRepository) List(ctx context.Context, filter domainRepo.ThreadFil
 
 	var models []model.ThreadModel
 	if err := db.Limit(filter.Limit).Offset(filter.Offset).Order("updated_at DESC").Find(&models).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to list threads: %w", err)
 	}
 
 	threads := make([]*entity.Thread, 0, len(models))
@@ -207,7 +214,10 @@ func (r *threadRepository) AddParticipant(ctx context.Context, p *entity.ThreadP
 		CreatedAt:  p.CreatedAt,
 		UpdatedAt:  p.UpdatedAt,
 	}
-	return r.db.WithContext(ctx).Create(m).Error
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return fmt.Errorf("failed to add participant: %w", err)
+	}
+	return nil
 }
 
 func (r *threadRepository) UpdateParticipant(ctx context.Context, p *entity.ThreadParticipant) error {
@@ -219,17 +229,23 @@ func (r *threadRepository) UpdateParticipant(ctx context.Context, p *entity.Thre
 		LastReadAt: p.LastReadAt,
 		UpdatedAt:  time.Now(),
 	}
-	return r.db.WithContext(ctx).Model(m).Updates(m).Error
+	if err := r.db.WithContext(ctx).Model(m).Updates(m).Error; err != nil {
+		return fmt.Errorf("failed to update participant: %w", err)
+	}
+	return nil
 }
 
 func (r *threadRepository) RemoveParticipant(ctx context.Context, threadID uuid.UUID, entityType string, entityID uuid.UUID) error {
-	return r.db.WithContext(ctx).Where("thread_id = ? AND entity_type = ? AND entity_id = ?", threadID, entityType, entityID).Delete(&model.ThreadParticipantModel{}).Error
+	if err := r.db.WithContext(ctx).Where("thread_id = ? AND entity_type = ? AND entity_id = ?", threadID, entityType, entityID).Delete(&model.ThreadParticipantModel{}).Error; err != nil {
+		return fmt.Errorf("failed to remove participant: %w", err)
+	}
+	return nil
 }
 
 func (r *threadRepository) GetParticipants(ctx context.Context, threadID uuid.UUID) ([]*entity.ThreadParticipant, error) {
 	var models []model.ThreadParticipantModel
 	if err := r.db.WithContext(ctx).Where("thread_id = ?", threadID).Find(&models).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get participants: %w", err)
 	}
 	res := make([]*entity.ThreadParticipant, 0, len(models))
 	for _, m := range models {
@@ -242,6 +258,32 @@ func (r *threadRepository) GetParticipants(ctx context.Context, threadID uuid.UU
 			CreatedAt:  m.CreatedAt,
 			UpdatedAt:  m.UpdatedAt,
 		})
+	}
+	return res, nil
+}
+
+func (r *threadRepository) GetParticipantsByThreadIDs(ctx context.Context, threadIDs []uuid.UUID) (map[uuid.UUID][]*entity.ThreadParticipant, error) {
+	if len(threadIDs) == 0 {
+		return make(map[uuid.UUID][]*entity.ThreadParticipant), nil
+	}
+
+	var models []model.ThreadParticipantModel
+	if err := r.db.WithContext(ctx).Where("thread_id IN ?", threadIDs).Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get participants by thread ids: %w", err)
+	}
+
+	res := make(map[uuid.UUID][]*entity.ThreadParticipant)
+	for _, m := range models {
+		p := &entity.ThreadParticipant{
+			ID:         m.ID,
+			ThreadID:   m.ThreadID,
+			EntityType: m.EntityType,
+			EntityID:   m.EntityID,
+			LastReadAt: m.LastReadAt,
+			CreatedAt:  m.CreatedAt,
+			UpdatedAt:  m.UpdatedAt,
+		}
+		res[m.ThreadID] = append(res[m.ThreadID], p)
 	}
 	return res, nil
 }
@@ -260,7 +302,7 @@ func (r *threadRepository) GetDirectThreadBetweenEntities(ctx context.Context, t
 		First(&m).Error
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get direct thread: %w", err)
 	}
 
 	return &entity.Thread{
@@ -277,5 +319,8 @@ func (r *threadRepository) GetDirectThreadBetweenEntities(ctx context.Context, t
 }
 
 func (r *threadRepository) MarkAsOverdue(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Model(&model.ThreadModel{}).Where("id = ?", id).Update("is_overdue", true).Error
+	if err := r.db.WithContext(ctx).Model(&model.ThreadModel{}).Where("id = ?", id).Update("is_overdue", true).Error; err != nil {
+		return fmt.Errorf("failed to mark thread as overdue: %w", err)
+	}
+	return nil
 }

@@ -123,7 +123,7 @@ func (s *tenantServiceImpl) ListTenants(ctx context.Context, filters repository.
 
 func (s *tenantServiceImpl) UpdateTenant(ctx context.Context, tenant *entity.Tenant) error {
 	if err := tenant.Validate(); err != nil {
-		return err
+		return fmt.Errorf("invalid tenant: %w", err)
 	}
 	if err := s.tenantRepo.Update(ctx, tenant); err != nil {
 		return fmt.Errorf("failed to update tenant %s: %w", tenant.ID, err)

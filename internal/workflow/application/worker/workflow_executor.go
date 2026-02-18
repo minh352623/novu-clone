@@ -9,13 +9,16 @@ import (
 
 	"CONVERDA/global"
 	"CONVERDA/internal/workflow/application/service"
+	wfDomain "CONVERDA/internal/workflow/domain"
 	"CONVERDA/internal/workflow/domain/model/entity"
 	"CONVERDA/internal/workflow/domain/repository"
+
+	"go.uber.org/zap"
 )
 
 const (
-	defaultPollInterval = 30 * time.Second
-	defaultBatchSize    = 50
+	defaultPollInterval = wfDomain.DefaultPollInterval
+	defaultBatchSize    = wfDomain.DefaultBatchSize
 )
 
 // WorkflowExecutor polls for scheduled step executions and processes them.
@@ -50,7 +53,7 @@ func NewWorkflowExecutor(
 
 // Run starts the polling loop. Blocks until context is cancelled.
 func (w *WorkflowExecutor) Run(ctx context.Context) {
-	global.Logger.Info("WorkflowExecutor: started (polling every " + w.interval.String() + ")")
+	global.Logger.Info("WorkflowExecutor: started", zap.Duration("pollInterval", w.interval))
 
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
@@ -71,7 +74,7 @@ func (w *WorkflowExecutor) poll(ctx context.Context) {
 	// Find step executions that are scheduled and due
 	stepExecs, err := w.execRepo.GetPendingScheduledSteps(ctx, w.batchSize)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to get pending steps: " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to get pending steps", zap.Error(err))
 		return
 	}
 
@@ -79,10 +82,19 @@ func (w *WorkflowExecutor) poll(ctx context.Context) {
 		return
 	}
 
-	global.Logger.Info("WorkflowExecutor: processing " + string(rune('0'+len(stepExecs))) + " scheduled steps")
+	global.Logger.Info("WorkflowExecutor: processing scheduled steps", zap.Int("count", len(stepExecs)))
 
 	for _, stepExec := range stepExecs {
-		w.processScheduledStep(ctx, stepExec)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					global.Logger.Error("WorkflowExecutor: panic recovered in step processing",
+						zap.Any("panic", r),
+						zap.String("stepExecutionID", stepExec.ID.String()))
+				}
+			}()
+			w.processScheduledStep(ctx, stepExec)
+		}()
 	}
 }
 
@@ -90,14 +102,14 @@ func (w *WorkflowExecutor) processScheduledStep(ctx context.Context, stepExec *e
 	// Get the parent execution
 	exec, err := w.execRepo.GetExecution(ctx, stepExec.ExecutionID)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to get execution " + stepExec.ExecutionID.String() + ": " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to get execution", zap.String("executionID", stepExec.ExecutionID.String()), zap.Error(err))
 		return
 	}
 
 	// Get the workflow with steps
 	workflow, err := w.workflowRepo.GetByID(ctx, exec.WorkflowID)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to get workflow " + exec.WorkflowID.String() + ": " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to get workflow", zap.String("workflowID", exec.WorkflowID.String()), zap.Error(err))
 		return
 	}
 
@@ -106,7 +118,7 @@ func (w *WorkflowExecutor) processScheduledStep(ctx context.Context, stepExec *e
 	stepExec.Status = entity.StepStatusCompleted
 	stepExec.CompletedAt = &now
 	if err := w.execRepo.UpdateStepExecution(ctx, stepExec); err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to update step execution: " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to update step execution", zap.Error(err))
 		return
 	}
 
@@ -132,14 +144,14 @@ func (w *WorkflowExecutor) processScheduledStep(ctx context.Context, stepExec *e
 		exec.Status = entity.WorkflowExecutionCompleted
 		exec.CompletedAt = &completedAt
 		_ = w.execRepo.UpdateExecution(ctx, exec)
-		global.Logger.Info("WorkflowExecutor: execution " + exec.ID.String() + " completed")
+		global.Logger.Info("WorkflowExecutor: execution completed", zap.String("executionID", exec.ID.String()))
 		return
 	}
 
 	// Get all step executions for this workflow execution
 	allStepExecs, err := w.execRepo.GetStepExecutionsByExecution(ctx, exec.ID)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to get step executions: " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to get step executions", zap.Error(err))
 		return
 	}
 
@@ -154,7 +166,7 @@ func (w *WorkflowExecutor) processScheduledStep(ctx context.Context, stepExec *e
 		step := &steps[i]
 		se := stepExecMap[step.ID.String()]
 		if se == nil {
-			global.Logger.Error("WorkflowExecutor: step execution not found for step " + step.ID.String())
+			global.Logger.Error("WorkflowExecutor: step execution not found", zap.String("stepID", step.ID.String()))
 			return
 		}
 
@@ -177,13 +189,13 @@ func (w *WorkflowExecutor) processScheduledStep(ctx context.Context, stepExec *e
 		case entity.StepTypeDigest:
 			handler = w.digestHandler
 		default:
-			global.Logger.Error("WorkflowExecutor: unknown step type " + step.StepType)
+			global.Logger.Error("WorkflowExecutor: unknown step type", zap.String("stepType", step.StepType))
 			w.markFailed(ctx, se, exec, "unknown step type: "+step.StepType)
 			return
 		}
 
 		if err := handler.Execute(ctx, step, exec, se); err != nil {
-			global.Logger.Error("WorkflowExecutor: step " + step.ID.String() + " failed: " + err.Error())
+			global.Logger.Error("WorkflowExecutor: step failed", zap.String("stepID", step.ID.String()), zap.Error(err))
 			w.markFailed(ctx, se, exec, err.Error())
 			return
 		}
@@ -212,7 +224,7 @@ func (w *WorkflowExecutor) processScheduledStep(ctx context.Context, stepExec *e
 func (w *WorkflowExecutor) pollDigest(ctx context.Context) {
 	stepExecs, err := w.execRepo.GetDigestingSteps(ctx, w.batchSize)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to get digesting steps: " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to get digesting steps", zap.Error(err))
 		return
 	}
 
@@ -224,14 +236,14 @@ func (w *WorkflowExecutor) pollDigest(ctx context.Context) {
 func (w *WorkflowExecutor) flushDigestStep(ctx context.Context, stepExec *entity.StepExecution) {
 	exec, err := w.execRepo.GetExecution(ctx, stepExec.ExecutionID)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to get execution for digest flush: " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to get execution for digest flush", zap.Error(err))
 		return
 	}
 
 	// Flush buffered events
 	events, err := w.execRepo.FlushDigestEvents(ctx, stepExec.StepID, exec.ID)
 	if err != nil {
-		global.Logger.Error("WorkflowExecutor: failed to flush digest events: " + err.Error())
+		global.Logger.Error("WorkflowExecutor: failed to flush digest events", zap.Error(err))
 		return
 	}
 

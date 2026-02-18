@@ -72,6 +72,11 @@ func (m *MockThreadRepository) GetParticipants(ctx context.Context, threadID uui
 	return args.Get(0).([]*entity.ThreadParticipant), args.Error(1)
 }
 
+func (m *MockThreadRepository) GetParticipantsByThreadIDs(ctx context.Context, threadIDs []uuid.UUID) (map[uuid.UUID][]*entity.ThreadParticipant, error) {
+	args := m.Called(ctx, threadIDs)
+	return args.Get(0).(map[uuid.UUID][]*entity.ThreadParticipant), args.Error(1)
+}
+
 func (m *MockThreadRepository) GetDirectThreadBetweenEntities(ctx context.Context, typeA string, idA uuid.UUID, typeB string, idB uuid.UUID) (*entity.Thread, error) {
 	args := m.Called(ctx, typeA, idA, typeB, idB)
 	if args.Get(0) == nil {

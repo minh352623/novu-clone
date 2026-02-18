@@ -197,7 +197,7 @@ func (d *webhookDispatcherImpl) handleFailure(ctx context.Context, logEntry *ent
 			zap.String("logID", logEntry.ID.String()),
 			zap.Duration("backoff", backoff))
 	} else {
-		global.Logger.Error("Webhook dispatch: max retries reached for log " + logEntry.ID.String() + " — dead letter")
+		global.Logger.Error("webhook_dispatcher: max retries reached — dead letter", zap.String("logID", logEntry.ID.String()))
 		logEntry.NextRetryAt = nil
 	}
 

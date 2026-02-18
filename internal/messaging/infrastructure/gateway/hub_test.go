@@ -5,9 +5,18 @@ import (
 	"testing"
 	"time"
 
+	"CONVERDA/global"
+	"CONVERDA/pkg/logger"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
+
+func init() {
+	z, _ := zap.NewDevelopment()
+	global.Logger = &logger.LoggerZap{Logger: z}
+}
 
 func newTestHub() *Hub {
 	hub := NewHub()

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"CONVERDA/internal/workflow/domain/model/entity"
 	domainRepo "CONVERDA/internal/workflow/domain/repository"
@@ -22,7 +23,10 @@ func NewWorkflowRepository(db *gorm.DB) domainRepo.WorkflowRepository {
 
 func (r *workflowRepository) Create(ctx context.Context, workflow *entity.Workflow) error {
 	m := mapper.ToWorkflowModel(workflow)
-	return r.db.WithContext(ctx).Create(m).Error
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return fmt.Errorf("failed to create workflow: %w", err)
+	}
+	return nil
 }
 
 func (r *workflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.Workflow, error) {
@@ -31,7 +35,7 @@ func (r *workflowRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity
 		return db.Order(`"order" ASC`)
 	}).First(&m, "id = ?", id).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get workflow by id: %w", err)
 	}
 	return mapper.ToWorkflowDomain(&m), nil
 }
@@ -46,7 +50,7 @@ func (r *workflowRepository) ListByEnvironment(ctx context.Context, envID uuid.U
 		Order("created_at DESC").
 		Find(&models).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list workflows by environment: %w", err)
 	}
 
 	result := make([]*entity.Workflow, 0, len(models))
@@ -58,11 +62,17 @@ func (r *workflowRepository) ListByEnvironment(ctx context.Context, envID uuid.U
 
 func (r *workflowRepository) Update(ctx context.Context, workflow *entity.Workflow) error {
 	m := mapper.ToWorkflowModel(workflow)
-	return r.db.WithContext(ctx).Save(m).Error
+	if err := r.db.WithContext(ctx).Save(m).Error; err != nil {
+		return fmt.Errorf("failed to update workflow: %w", err)
+	}
+	return nil
 }
 
 func (r *workflowRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&model.WorkflowModel{}, "id = ?", id).Error
+	if err := r.db.WithContext(ctx).Delete(&model.WorkflowModel{}, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("failed to delete workflow: %w", err)
+	}
+	return nil
 }
 
 func (r *workflowRepository) GetByTrigger(ctx context.Context, envID uuid.UUID, triggerIdentifier string) (*entity.Workflow, error) {
@@ -74,7 +84,7 @@ func (r *workflowRepository) GetByTrigger(ctx context.Context, envID uuid.UUID, 
 		}).
 		First(&m).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get workflow by trigger: %w", err)
 	}
 	return mapper.ToWorkflowDomain(&m), nil
 }
@@ -83,16 +93,25 @@ func (r *workflowRepository) GetByTrigger(ctx context.Context, envID uuid.UUID, 
 
 func (r *workflowRepository) AddStep(ctx context.Context, step *entity.WorkflowStep) error {
 	m := mapper.ToStepModel(step)
-	return r.db.WithContext(ctx).Create(m).Error
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return fmt.Errorf("failed to add step to workflow: %w", err)
+	}
+	return nil
 }
 
 func (r *workflowRepository) UpdateStep(ctx context.Context, step *entity.WorkflowStep) error {
 	m := mapper.ToStepModel(step)
-	return r.db.WithContext(ctx).Save(m).Error
+	if err := r.db.WithContext(ctx).Save(m).Error; err != nil {
+		return fmt.Errorf("failed to update workflow step: %w", err)
+	}
+	return nil
 }
 
 func (r *workflowRepository) DeleteStep(ctx context.Context, stepID uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&model.WorkflowStepModel{}, "id = ?", stepID).Error
+	if err := r.db.WithContext(ctx).Delete(&model.WorkflowStepModel{}, "id = ?", stepID).Error; err != nil {
+		return fmt.Errorf("failed to delete workflow step: %w", err)
+	}
+	return nil
 }
 
 func (r *workflowRepository) GetStepsByWorkflow(ctx context.Context, workflowID uuid.UUID) ([]entity.WorkflowStep, error) {
@@ -102,7 +121,7 @@ func (r *workflowRepository) GetStepsByWorkflow(ctx context.Context, workflowID 
 		Order(`"order" ASC`).
 		Find(&models).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get steps for workflow: %w", err)
 	}
 
 	result := make([]entity.WorkflowStep, 0, len(models))

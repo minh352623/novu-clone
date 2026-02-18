@@ -472,7 +472,7 @@ func (s *conversationServiceImpl) CreateGroupThread(ctx context.Context, envID u
 		return nil, fmt.Errorf("failed to create group thread: %w", err)
 	}
 
-	var savedParticipants []*entity.ThreadParticipant
+	savedParticipants := make([]*entity.ThreadParticipant, 0, len(inputParticipants))
 	for _, p := range inputParticipants {
 		// Create new participant object with correct ThreadID
 		part := entity.NewThreadParticipant(thread.ID, p.EntityType, p.EntityID)
@@ -606,10 +606,17 @@ func (s *conversationServiceImpl) ListThreads(ctx context.Context, tenantID, env
 		return nil, 0, fmt.Errorf("failed to list threads: %w", err)
 	}
 
-	// Enrich with participants
-	for _, t := range threads {
-		parts, _ := s.threadRepo.GetParticipants(ctx, t.ID)
-		t.Participants = parts
+	// Enrich with participants (Bulk Fetch to avoid N+1)
+	threadIDs := make([]uuid.UUID, len(threads))
+	for i, t := range threads {
+		threadIDs[i] = t.ID
+	}
+
+	participantsMap, err := s.threadRepo.GetParticipantsByThreadIDs(ctx, threadIDs)
+	if err == nil {
+		for _, t := range threads {
+			t.Participants = participantsMap[t.ID]
+		}
 	}
 
 	return threads, total, nil
@@ -724,7 +731,7 @@ func (s *conversationServiceImpl) GetAgentStats(ctx context.Context, tenantID, e
 
 func (s *conversationServiceImpl) getSLAThreshold(ctx context.Context, envID uuid.UUID) int {
 	if envID == uuid.Nil {
-		return 900
+		return entity.DefaultSLAThresholdSeconds
 	}
 
 	env, err := s.appReader.GetEnvironment(ctx, envID)
@@ -739,7 +746,7 @@ func (s *conversationServiceImpl) getSLAThreshold(ctx context.Context, envID uui
 		}
 	}
 
-	return 900 // Default 15m
+	return entity.DefaultSLAThresholdSeconds // Default 15m
 }
 
 func (s *conversationServiceImpl) GetThreadAuditTrail(ctx context.Context, envID, threadID uuid.UUID, page, pageSize int, from, to *time.Time) (*dto.AuditTrailResponse, error) {

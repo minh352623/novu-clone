@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"CONVERDA/internal/iam/domain/model/entity"
 	"CONVERDA/internal/iam/domain/repository"
@@ -24,7 +25,7 @@ func NewInvitationRepository(db *gorm.DB) repository.InvitationRepository {
 func (r *invitationRepository) Create(ctx context.Context, invitation *entity.TenantInvitation) (*entity.TenantInvitation, error) {
 	m := mapper.ToInvitationModel(invitation)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create invitation: %w", err)
 	}
 	return mapper.ToInvitationEntity(m), nil
 }
@@ -53,13 +54,16 @@ func (r *invitationRepository) GetByEmailAndTenant(ctx context.Context, email st
 
 func (r *invitationRepository) Update(ctx context.Context, invitation *entity.TenantInvitation) error {
 	m := mapper.ToInvitationModel(invitation)
-	return r.db.WithContext(ctx).Save(m).Error
+	if err := r.db.WithContext(ctx).Save(m).Error; err != nil {
+		return fmt.Errorf("failed to update invitation: %w", err)
+	}
+	return nil
 }
 
 func (r *invitationRepository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]*entity.TenantInvitation, error) {
 	var models []*model.TenantInvitationModel
 	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("created_at desc").Find(&models).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list invitations by tenant: %w", err)
 	}
 	return mapper.ToInvitationEntities(models), nil
 }

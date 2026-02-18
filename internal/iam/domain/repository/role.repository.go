@@ -15,11 +15,8 @@ type RoleFilters struct {
 	Offset int
 }
 
-// RoleRepository defines the interface for role persistence
-type RoleRepository interface {
-	// Create creates a new role
-	Create(ctx context.Context, role *entity.Role) (*entity.Role, error)
-
+// RoleReader defines read operations for roles
+type RoleReader interface {
 	// GetByID retrieves a role by ID
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.Role, error)
 
@@ -31,6 +28,12 @@ type RoleRepository interface {
 
 	// CountAll counts all roles with filters
 	CountAll(ctx context.Context, filters RoleFilters) (int64, error)
+}
+
+// RoleWriter defines write operations for roles
+type RoleWriter interface {
+	// Create creates a new role
+	Create(ctx context.Context, role *entity.Role) (*entity.Role, error)
 
 	// Update updates a role
 	Update(ctx context.Context, role *entity.Role) error
@@ -40,4 +43,10 @@ type RoleRepository interface {
 
 	// UpdatePermissions updates the permissions JSONB for a role
 	UpdatePermissions(ctx context.Context, id uuid.UUID, permissions map[string]interface{}) error
+}
+
+// RoleRepository defines the interface for role persistence by combining reader and writer
+type RoleRepository interface {
+	RoleReader
+	RoleWriter
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/controller/dto"
 	"CONVERDA/internal/notification/domain/entity"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type JobController struct {
@@ -66,8 +68,7 @@ func (c *JobController) ScheduleJob(ctx *gin.Context) (interface{}, error) {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					// Use global logger or slog here
-					_ = r // panic recovered, job.ID can be logged
+					global.Logger.Error("job_controller: panic recovered in background processing", zap.Any("panic", r), zap.String("jobID", job.ID.String()))
 				}
 			}()
 			// Create a background context with timeout?

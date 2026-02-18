@@ -30,6 +30,7 @@ type ThreadRepository interface {
 	UpdateParticipant(ctx context.Context, p *entity.ThreadParticipant) error
 	RemoveParticipant(ctx context.Context, threadID uuid.UUID, entityType string, entityID uuid.UUID) error
 	GetParticipants(ctx context.Context, threadID uuid.UUID) ([]*entity.ThreadParticipant, error)
+	GetParticipantsByThreadIDs(ctx context.Context, threadIDs []uuid.UUID) (map[uuid.UUID][]*entity.ThreadParticipant, error)
 
 	// Secure management
 	GetByIDAndEnv(ctx context.Context, id, envID uuid.UUID) (*entity.Thread, error)

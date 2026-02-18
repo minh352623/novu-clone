@@ -9,13 +9,13 @@ import (
 	"CONVERDA/internal/middleware"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 )
 
 // InitIAMModule initializes the IAM module
-func InitIAMModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	db := global.GormDB
+func InitIAMModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.HandlerFunc) {
 
 	// Repositories
 	userRepo := repository.NewUserRepository(db)

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"CONVERDA/internal/apps/domain/model/entity"
@@ -77,13 +78,13 @@ func (r *usageMetricRepository) GetDetailedSummary(ctx context.Context, appID uu
 	}
 
 	err := r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
-		Select(`
+		Select(fmt.Sprintf(`
 			COUNT(*) as total,
 			SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound,
 			SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound,
-			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
-			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
-		`).
+			SUM(CASE WHEN status_code BETWEEN %d AND %d THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < %d OR status_code > %d THEN 1 ELSE 0 END) as failed
+		`, entity.SuccessStatusMin, entity.SuccessStatusMax, entity.SuccessStatusMin, entity.SuccessStatusMax)).
 		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to).
 		Scan(&overallResult).Error
 
@@ -100,12 +101,12 @@ func (r *usageMetricRepository) GetDetailedSummary(ctx context.Context, appID uu
 	}
 
 	err = r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
-		Select(`
+		Select(fmt.Sprintf(`
 			provider_type,
 			COUNT(*) as total,
-			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
-			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
-		`).
+			SUM(CASE WHEN status_code BETWEEN %d AND %d THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < %d OR status_code > %d THEN 1 ELSE 0 END) as failed
+		`, entity.SuccessStatusMin, entity.SuccessStatusMax, entity.SuccessStatusMin, entity.SuccessStatusMax)).
 		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to).
 		Group("provider_type").
 		Scan(&providerResults).Error
@@ -143,13 +144,13 @@ func (r *usageMetricRepository) GetDailyTimeSeries(ctx context.Context, appID uu
 	}
 
 	query := r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
-		Select(`
+		Select(fmt.Sprintf(`
 			TO_CHAR(timestamp, 'YYYY-MM-DD') as date,
 			SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound,
 			SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound,
-			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
-			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
-		`).
+			SUM(CASE WHEN status_code BETWEEN %d AND %d THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < %d OR status_code > %d THEN 1 ELSE 0 END) as failed
+		`, entity.SuccessStatusMin, entity.SuccessStatusMax, entity.SuccessStatusMin, entity.SuccessStatusMax)).
 		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to)
 
 	if envID != nil {
@@ -189,14 +190,14 @@ func (r *usageMetricRepository) GetEnvironmentBreakdown(ctx context.Context, app
 	}
 
 	err := r.db.WithContext(ctx).Model(&model.UsageMetricModel{}).
-		Select(`
+		Select(fmt.Sprintf(`
 			environment_id,
 			COUNT(*) as total,
 			SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound,
 			SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound,
-			SUM(CASE WHEN status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as success,
-			SUM(CASE WHEN status_code < 200 OR status_code >= 300 THEN 1 ELSE 0 END) as failed
-		`).
+			SUM(CASE WHEN status_code BETWEEN %d AND %d THEN 1 ELSE 0 END) as success,
+			SUM(CASE WHEN status_code < %d OR status_code > %d THEN 1 ELSE 0 END) as failed
+		`, entity.SuccessStatusMin, entity.SuccessStatusMax, entity.SuccessStatusMin, entity.SuccessStatusMax)).
 		Where("app_id = ? AND timestamp BETWEEN ? AND ?", appID, from, to).
 		Group("environment_id").
 		Scan(&results).Error

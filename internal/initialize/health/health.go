@@ -2,6 +2,7 @@ package health
 
 import (
 	"CONVERDA/internal/health/controller"
+	healthDomain "CONVERDA/internal/health/domain"
 	healthRepo "CONVERDA/internal/health/infrastructure/repository"
 	"CONVERDA/internal/health/service/impl"
 	"CONVERDA/pkg/response"
@@ -12,8 +13,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const defaultSLAThreshold = 900 // 15 minutes
-
 // InitHealthModule initializes the shared Health module.
 func InitHealthModule(db *gorm.DB, router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	// Repository Adapters
@@ -22,7 +21,7 @@ func InitHealthModule(db *gorm.DB, router *gin.RouterGroup, authMiddleware gin.H
 	webhookAdapter := healthRepo.NewWebhookHealthAdapter(db)
 
 	// Service
-	healthService := impl.NewHealthService(threadAdapter, slaAdapter, webhookAdapter, defaultSLAThreshold)
+	healthService := impl.NewHealthService(threadAdapter, slaAdapter, webhookAdapter, healthDomain.DefaultSLAThreshold)
 
 	// Controller
 	healthController := controller.NewHealthDashboardController(healthService)

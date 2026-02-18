@@ -16,11 +16,8 @@ type TenantFilters struct {
 	Offset        int
 }
 
-// TenantRepository defines the interface for tenant persistence
-type TenantRepository interface {
-	// Create creates a new tenant
-	Create(ctx context.Context, tenant *entity.Tenant) (*entity.Tenant, error)
-
+// TenantReader defines the interface for reading tenant data
+type TenantReader interface {
 	// GetByID retrieves a tenant by ID
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.Tenant, error)
 
@@ -33,6 +30,15 @@ type TenantRepository interface {
 	// CountAll counts all tenants with filters
 	CountAll(ctx context.Context, filters TenantFilters) (int64, error)
 
+	// GetByUserID retrieves all tenants that a user is a member of
+	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*entity.Tenant, error)
+}
+
+// TenantWriter defines the interface for writing tenant data
+type TenantWriter interface {
+	// Create creates a new tenant
+	Create(ctx context.Context, tenant *entity.Tenant) (*entity.Tenant, error)
+
 	// Update updates a tenant
 	Update(ctx context.Context, tenant *entity.Tenant) error
 
@@ -41,7 +47,10 @@ type TenantRepository interface {
 
 	// AssignPricingPlan assigns a pricing plan to a tenant
 	AssignPricingPlan(ctx context.Context, tenantID, planID uuid.UUID) error
+}
 
-	// GetByUserID retrieves all tenants that a user is a member of
-	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*entity.Tenant, error)
+// TenantRepository defines the complete interface for tenant persistence
+type TenantRepository interface {
+	TenantReader
+	TenantWriter
 }

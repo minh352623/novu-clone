@@ -9,10 +9,10 @@ import (
 	"CONVERDA/internal/middleware"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func InitAppsModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	db := global.GormDB
+func InitAppsModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.HandlerFunc) {
 
 	// Repositories (Apps)
 	appRepo := repository.NewAppRepository(db)

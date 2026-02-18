@@ -8,6 +8,7 @@ import (
 
 	"CONVERDA/global"
 	"CONVERDA/internal/notification/application/service"
+	notifDomain "CONVERDA/internal/notification/domain"
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
 	"CONVERDA/internal/notification/infrastructure/provider"
@@ -35,7 +36,6 @@ func NewNotificationService(
 }
 
 func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequest) (*service.SendResponse, error) {
-	// 1. Validate inputs (basic)
 	if req.TemplateCode == "" || req.Recipient == "" || req.Channel == "" {
 		return nil, fmt.Errorf("missing required fields")
 	}
@@ -53,7 +53,7 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	// Default language if not provided
 	lang := req.Language
 	if lang == "" {
-		lang = "en"
+		lang = notifDomain.DefaultLanguage
 	}
 
 	subject, body, err := s.tmplManager.GetAndCompile(ctx, envID, req.TemplateCode, lang, req.Data)
@@ -84,11 +84,11 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	// 5. Update Status
 	now := time.Now()
 	if dispatchErr != nil {
-		notif.Status = "failed"
+		notif.Status = notifDomain.StatusFailed
 		errMsg := dispatchErr.Error()
 		notif.ErrorMessage = &errMsg
 	} else {
-		notif.Status = "sent"
+		notif.Status = notifDomain.StatusSent
 		notif.SentAt = &now
 	}
 	notif.UpdatedAt = now

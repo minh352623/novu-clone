@@ -15,19 +15,21 @@ import (
 
 // authServiceImpl implements AuthService
 type authServiceImpl struct {
-	userRepo repository.UserRepository
+	userReader repository.UserReader
+	userWriter repository.UserWriter
 }
 
 // NewAuthService creates a new AuthService
 func NewAuthService(userRepo repository.UserRepository) service.AuthService {
 	return &authServiceImpl{
-		userRepo: userRepo,
+		userReader: userRepo,
+		userWriter: userRepo,
 	}
 }
 
 func (s *authServiceImpl) Register(ctx context.Context, email, password string, fullName *string) (*entity.User, error) {
 	// Check if user exists
-	exists, err := s.userRepo.ExistsByEmail(ctx, email)
+	exists, err := s.userReader.ExistsByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -42,7 +44,7 @@ func (s *authServiceImpl) Register(ctx context.Context, email, password string, 
 	}
 
 	// Persist user
-	createdUser, err := s.userRepo.Create(ctx, user)
+	createdUser, err := s.userWriter.Create(ctx, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
@@ -51,7 +53,7 @@ func (s *authServiceImpl) Register(ctx context.Context, email, password string, 
 }
 
 func (s *authServiceImpl) Login(ctx context.Context, email, password string) (*entity.User, error) {
-	user, err := s.userRepo.GetByEmail(ctx, email)
+	user, err := s.userReader.GetByEmail(ctx, email)
 	if err != nil {
 		global.Logger.Error("auth: failed to get user by email", zap.String("email", email), zap.Error(err))
 		return nil, service.ErrInvalidCredentials
@@ -66,7 +68,7 @@ func (s *authServiceImpl) Login(ctx context.Context, email, password string) (*e
 
 	// Record login
 	user.RecordLogin()
-	if err := s.userRepo.UpdateLastLogin(ctx, user.ID); err != nil {
+	if err := s.userWriter.UpdateLastLogin(ctx, user.ID); err != nil {
 		global.Logger.Warn("auth: failed to update last login", zap.String("userID", user.ID.String()), zap.Error(err))
 	}
 
@@ -74,7 +76,7 @@ func (s *authServiceImpl) Login(ctx context.Context, email, password string) (*e
 }
 
 func (s *authServiceImpl) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error {
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.userReader.GetByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
@@ -92,7 +94,7 @@ func (s *authServiceImpl) ChangePassword(ctx context.Context, userID uuid.UUID, 
 		return fmt.Errorf("failed to update password: %w", err)
 	}
 
-	if err := s.userRepo.UpdatePassword(ctx, userID, user.PasswordHash); err != nil {
+	if err := s.userWriter.UpdatePassword(ctx, userID, user.PasswordHash); err != nil {
 		return fmt.Errorf("failed to save password: %w", err)
 	}
 
@@ -100,7 +102,7 @@ func (s *authServiceImpl) ChangePassword(ctx context.Context, userID uuid.UUID, 
 }
 
 func (s *authServiceImpl) GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.userReader.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}

@@ -80,7 +80,7 @@ func (s *roleServiceImpl) ListRoles(ctx context.Context, filters repository.Role
 
 func (s *roleServiceImpl) UpdateRole(ctx context.Context, role *entity.Role) error {
 	if err := role.Validate(); err != nil {
-		return err
+		return fmt.Errorf("invalid role: %w", err)
 	}
 	if err := s.roleRepo.Update(ctx, role); err != nil {
 		return fmt.Errorf("failed to update role %s: %w", role.ID, err)

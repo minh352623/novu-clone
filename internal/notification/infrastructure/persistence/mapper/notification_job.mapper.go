@@ -86,9 +86,9 @@ func ToJobModel(e *entity.NotificationJob) *model.NotificationJobModel {
 }
 
 func ToJobDomainList(models []*model.NotificationJobModel) []*entity.NotificationJob {
-	var result []*entity.NotificationJob
-	for _, m := range models {
-		result = append(result, ToJobDomain(m))
+	result := make([]*entity.NotificationJob, len(models))
+	for i, m := range models {
+		result[i] = ToJobDomain(m)
 	}
 	return result
 }

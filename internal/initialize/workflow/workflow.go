@@ -8,6 +8,7 @@ import (
 	"CONVERDA/internal/workflow/application/service/impl"
 	"CONVERDA/internal/workflow/application/worker"
 	"CONVERDA/internal/workflow/controller"
+	"CONVERDA/internal/workflow/infrastructure/adapter"
 	infraRepo "CONVERDA/internal/workflow/infrastructure/persistence/repository"
 	"CONVERDA/pkg/response"
 
@@ -21,8 +22,11 @@ func InitWorkflowModule(db *gorm.DB, router *gin.RouterGroup, authMiddleware gin
 	workflowRepo := infraRepo.NewWorkflowRepository(db)
 	execRepo := infraRepo.NewExecutionRepository(db)
 
+	// Adapters
+	notifier := adapter.NewLocalNotifierAdapter(notifInit.NotificationService)
+
 	// Step handlers
-	channelHandler := impl.NewChannelHandler(notifInit.NotificationService)
+	channelHandler := impl.NewChannelHandler(notifier)
 	delayHandler := impl.NewDelayHandler(execRepo)
 	digestHandler := impl.NewDigestHandler(execRepo)
 

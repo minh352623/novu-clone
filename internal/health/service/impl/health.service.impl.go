@@ -2,12 +2,15 @@ package impl
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"CONVERDA/global"
 	"CONVERDA/internal/health/dto"
 	"CONVERDA/internal/health/service"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // QueueReader provides read access to the messaging queue state.
@@ -52,19 +55,22 @@ func (s *healthServiceImpl) GetSystemHealth(ctx context.Context, envID uuid.UUID
 	// 1. Queue Health
 	queueHealth, err := s.buildQueueHealth(ctx, envID)
 	if err != nil {
-		return nil, err
+		global.Logger.Error("health_service: failed to build queue health", zap.Error(err), zap.String("environmentID", envID.String()))
+		return nil, fmt.Errorf("failed to build queue health: %w", err)
 	}
 
 	// 2. SLA Compliance
 	sla, err := s.slaReader.GetSLACompliance(ctx, envID, s.slaThreshold, from, to)
 	if err != nil {
-		return nil, err
+		global.Logger.Error("health_service: failed to fetch SLA compliance", zap.Error(err), zap.String("environmentID", envID.String()))
+		return nil, fmt.Errorf("failed to fetch SLA compliance: %w", err)
 	}
 
 	// 3. Webhook Health
 	wh, err := s.webhookReader.GetHealthStats(ctx, from, to)
 	if err != nil {
-		return nil, err
+		global.Logger.Error("health_service: failed to fetch webhook health", zap.Error(err), zap.String("environmentID", envID.String()))
+		return nil, fmt.Errorf("failed to fetch webhook health: %w", err)
 	}
 
 	return &dto.SystemHealthResponse{
@@ -78,22 +84,22 @@ func (s *healthServiceImpl) GetSystemHealth(ctx context.Context, envID uuid.UUID
 func (s *healthServiceImpl) buildQueueHealth(ctx context.Context, envID uuid.UUID) (*dto.QueueHealth, error) {
 	unassigned, err := s.queueReader.CountByStatus(ctx, envID, "unassigned")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to count unassigned messages: %w", err)
 	}
 
 	assigned, err := s.queueReader.CountByStatus(ctx, envID, "assigned")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to count assigned messages: %w", err)
 	}
 
 	overdue, err := s.queueReader.CountOverdue(ctx, envID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to count overdue messages: %w", err)
 	}
 
 	avgWait, err := s.queueReader.AvgWaitTime(ctx, envID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get average wait time: %w", err)
 	}
 
 	return &dto.QueueHealth{

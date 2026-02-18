@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"CONVERDA/internal/workflow/domain/model/entity"
@@ -23,31 +24,43 @@ func NewExecutionRepository(db *gorm.DB) domainRepo.ExecutionRepository {
 
 func (r *executionRepository) CreateExecution(ctx context.Context, exec *entity.WorkflowExecution) error {
 	m := mapper.ToExecutionModel(exec)
-	return r.db.WithContext(ctx).Create(m).Error
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return fmt.Errorf("failed to create execution: %w", err)
+	}
+	return nil
 }
 
 func (r *executionRepository) GetExecution(ctx context.Context, id uuid.UUID) (*entity.WorkflowExecution, error) {
 	var m model.WorkflowExecutionModel
 	err := r.db.WithContext(ctx).First(&m, "id = ?", id).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get execution: %w", err)
 	}
 	return mapper.ToExecutionDomain(&m), nil
 }
 
 func (r *executionRepository) UpdateExecution(ctx context.Context, exec *entity.WorkflowExecution) error {
 	m := mapper.ToExecutionModel(exec)
-	return r.db.WithContext(ctx).Save(m).Error
+	if err := r.db.WithContext(ctx).Save(m).Error; err != nil {
+		return fmt.Errorf("failed to update execution: %w", err)
+	}
+	return nil
 }
 
 func (r *executionRepository) CreateStepExecution(ctx context.Context, stepExec *entity.StepExecution) error {
 	m := mapper.ToStepExecutionModel(stepExec)
-	return r.db.WithContext(ctx).Create(m).Error
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return fmt.Errorf("failed to create step execution: %w", err)
+	}
+	return nil
 }
 
 func (r *executionRepository) UpdateStepExecution(ctx context.Context, stepExec *entity.StepExecution) error {
 	m := mapper.ToStepExecutionModel(stepExec)
-	return r.db.WithContext(ctx).Save(m).Error
+	if err := r.db.WithContext(ctx).Save(m).Error; err != nil {
+		return fmt.Errorf("failed to update step execution: %w", err)
+	}
+	return nil
 }
 
 func (r *executionRepository) GetPendingScheduledSteps(ctx context.Context, limit int) ([]*entity.StepExecution, error) {
@@ -58,7 +71,7 @@ func (r *executionRepository) GetPendingScheduledSteps(ctx context.Context, limi
 		Limit(limit).
 		Find(&models).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get pending scheduled steps: %w", err)
 	}
 
 	result := make([]*entity.StepExecution, 0, len(models))
@@ -74,7 +87,7 @@ func (r *executionRepository) GetStepExecutionsByExecution(ctx context.Context, 
 		Where("execution_id = ?", executionID).
 		Find(&models).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get step executions by execution: %w", err)
 	}
 
 	result := make([]*entity.StepExecution, 0, len(models))
@@ -88,7 +101,10 @@ func (r *executionRepository) GetStepExecutionsByExecution(ctx context.Context, 
 
 func (r *executionRepository) BufferDigestEvent(ctx context.Context, event *entity.DigestEvent) error {
 	m := mapper.ToDigestEventModel(event)
-	return r.db.WithContext(ctx).Create(m).Error
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return fmt.Errorf("failed to buffer digest event: %w", err)
+	}
+	return nil
 }
 
 func (r *executionRepository) FlushDigestEvents(ctx context.Context, stepID, executionID uuid.UUID) ([]*entity.DigestEvent, error) {
@@ -98,7 +114,7 @@ func (r *executionRepository) FlushDigestEvents(ctx context.Context, stepID, exe
 		Order("created_at ASC").
 		Find(&models).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to flush digest events: %w", err)
 	}
 
 	// Delete flushed events
@@ -123,7 +139,7 @@ func (r *executionRepository) GetDigestingSteps(ctx context.Context, limit int) 
 		Limit(limit).
 		Find(&models).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get digesting steps: %w", err)
 	}
 
 	result := make([]*entity.StepExecution, 0, len(models))

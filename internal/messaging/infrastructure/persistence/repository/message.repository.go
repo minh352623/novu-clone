@@ -41,7 +41,7 @@ func (r *messageRepository) Create(ctx context.Context, msg *entity.Message) (*e
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1. Insert Message
 		if err := tx.Create(msgModel).Error; err != nil {
-			return err
+			return fmt.Errorf("failed to create message: %w", err)
 		}
 
 		// 2. Insert Closure Paths
@@ -52,7 +52,7 @@ func (r *messageRepository) Create(ctx context.Context, msg *entity.Message) (*e
 			Depth:        0,
 		}
 		if err := tx.Create(&selfRef).Error; err != nil {
-			return err
+			return fmt.Errorf("failed to create self-reference closure: %w", err)
 		}
 
 		// Ancestor paths (Distance + 1)
@@ -91,7 +91,7 @@ func (r *messageRepository) GetMessagesByThread(ctx context.Context, threadID uu
 		Find(&models).Error
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get messages by thread: %w", err)
 	}
 
 	entities := make([]*entity.Message, 0, len(models))
@@ -122,7 +122,7 @@ func (r *messageRepository) ListByThread(ctx context.Context, threadID uuid.UUID
 		Find(&models).Error
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list messages by thread: %w", err)
 	}
 
 	entities := make([]*entity.Message, 0, len(models))
@@ -166,7 +166,7 @@ func (r *messageRepository) ListByCursor(ctx context.Context, threadID uuid.UUID
 	}
 
 	if err := query.Limit(limit).Find(&models).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list messages by cursor: %w", err)
 	}
 
 	entities := make([]*entity.Message, 0, len(models))

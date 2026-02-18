@@ -9,6 +9,7 @@ import (
 	domainRepo "CONVERDA/internal/messaging/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 const (
@@ -75,16 +76,16 @@ func (w *SLAWorker) internalCheckSLA(ctx context.Context) {
 				Offset:    offset,
 			})
 			if err != nil {
-				global.Logger.Error("SLA Worker: failed to list threads for status " + status + ": " + err.Error())
+				global.Logger.Error("SLA Worker: failed to list threads", zap.String("status", status), zap.Error(err))
 				break
 			}
 
 			for _, t := range threads {
 				if w.isThreadOverdue(ctx, t) {
 					if err := w.threadRepo.MarkAsOverdue(ctx, t.ID); err != nil {
-						global.Logger.Error("SLA Worker: failed to mark thread " + t.ID.String() + " as overdue: " + err.Error())
+						global.Logger.Error("SLA Worker: failed to mark thread as overdue", zap.String("threadID", t.ID.String()), zap.Error(err))
 					} else {
-						global.Logger.Info("SLA Worker: thread " + t.ID.String() + " marked as overdue")
+						global.Logger.Info("SLA Worker: thread marked as overdue", zap.String("threadID", t.ID.String()))
 					}
 				}
 			}

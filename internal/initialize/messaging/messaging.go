@@ -14,10 +14,10 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func InitMessagingModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	db := global.GormDB
+func InitMessagingModule(v1 *gin.RouterGroup, db *gorm.DB, authMiddleware gin.HandlerFunc) {
 
 	// Repositories
 	msgRepo := repository.NewMessageRepository(db)
@@ -50,7 +50,7 @@ func InitMessagingModule(router *gin.RouterGroup, authMiddleware gin.HandlerFunc
 	envAuthMiddleware := middleware.EnvKeyAuth(authRepo)
 
 	// Routes
-	controller.RegisterMessagingRoutes(router, convController, authMiddleware, envAuthMiddleware)
+	controller.RegisterMessagingRoutes(v1, convController, authMiddleware, envAuthMiddleware)
 
 	global.Logger.Info("Messaging module initialized")
 }

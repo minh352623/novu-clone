@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -27,19 +28,19 @@ func (p *RLSPlugin) Name() string {
 func (p *RLSPlugin) Initialize(db *gorm.DB) error {
 	// Register callbacks for all operations
 	if err := db.Callback().Create().Before("gorm:create").Register("rls:before_create", p.setTenant); err != nil {
-		return err
+		return fmt.Errorf("failed to register rls:before_create callback: %w", err)
 	}
 	if err := db.Callback().Query().Before("gorm:query").Register("rls:before_query", p.setTenant); err != nil {
-		return err
+		return fmt.Errorf("failed to register rls:before_query callback: %w", err)
 	}
 	if err := db.Callback().Update().Before("gorm:update").Register("rls:before_update", p.setTenant); err != nil {
-		return err
+		return fmt.Errorf("failed to register rls:before_update callback: %w", err)
 	}
 	if err := db.Callback().Delete().Before("gorm:delete").Register("rls:before_delete", p.setTenant); err != nil {
-		return err
+		return fmt.Errorf("failed to register rls:before_delete callback: %w", err)
 	}
 	if err := db.Callback().Row().Before("gorm:row").Register("rls:before_row", p.setTenant); err != nil {
-		return err
+		return fmt.Errorf("failed to register rls:before_row callback: %w", err)
 	}
 	return nil
 }

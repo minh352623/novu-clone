@@ -134,7 +134,7 @@ func (s *triggerServiceImpl) executeStepsFrom(ctx context.Context,
 
 		// Delay steps set their own status to "scheduled" — stop processing
 		if step.StepType == entity.StepTypeDelay {
-			global.Logger.Info("Workflow trigger: delay step scheduled, pausing execution " + exec.ID.String())
+			global.Logger.Info("workflow_trigger: delay step scheduled, pausing execution", zap.String("executionID", exec.ID.String()))
 			return
 		}
 

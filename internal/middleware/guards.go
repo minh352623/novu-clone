@@ -18,6 +18,7 @@ import (
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 const SHARED_SECRET_KEY = "your-very-secret-and-long-key" // !!! in env
@@ -56,7 +57,7 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		if ctx.Request.Body != nil {
 			bodyBytes, err = io.ReadAll(ctx.Request.Body)
 			if err != nil {
-				global.Logger.Error("HMAC Auth: error reading request body: " + err.Error())
+				global.Logger.Error("HMAC Auth: error reading request body", zap.Error(err))
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, response.NewAPIError(http.StatusInternalServerError, "Server Error", "Could not read request body"))
 				return
 			}
@@ -65,11 +66,11 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		}
 
 		stringToSign := buildStringToSign(ctx, requestTimeStr, bodyBytes)
-		global.Logger.Info("HMAC Auth: server StringToSign: [" + strings.ReplaceAll(stringToSign, "\n", "\\n") + "]")
+		global.Logger.Info("HMAC Auth: server StringToSign", zap.String("content", strings.ReplaceAll(stringToSign, "\n", "\\n")))
 
 		// 3. Tính toán HMAC phía server
 		serverSign := calculateHMAC(stringToSign, SHARED_SECRET_KEY)
-		global.Logger.Info("HMAC Auth: ClientSign: " + clientSign + ", ServerSign: " + serverSign)
+		global.Logger.Info("HMAC Auth: verification", zap.String("clientSign", clientSign), zap.String("serverSign", serverSign))
 
 		// 4. So sánh chữ ký
 		// Sử dụng hmac.Equal để so sánh an toàn, chống timing attacks
@@ -107,29 +108,22 @@ func buildStringToSign(ctx *gin.Context, requestTimeStr string, bodyBytes []byte
 	}
 	canonicalQueryString := strings.Join(canonicalQueryParts, "&")
 
-	// Xử lý body:
-	//  - Nếu body rỗng, có thể dùng chuỗi rỗng hoặc một hash cố định của chuỗi rỗng.
-	//  - Nếu body không rỗng, nên hash body (ví dụ SHA256) rồi đưa hash đó vào stringToSign.
-	//    Điều này an toàn hơn là đưa raw body (có thể rất lớn) vào stringToSign.
-	//    Ở đây, để đơn giản, tôi sẽ đưa raw bodyBytes (đã được convert sang string) vào,
-	//    nhưng HASHING BODY LÀ BEST PRACTICE.
-	bodyString := ""
+	// HASHING BODY IS BEST PRACTICE.
+	bodyHash := ""
 	if len(bodyBytes) > 0 {
-		bodyString = string(bodyBytes) // CẢNH BÁO: Nếu body không phải UTF-8, sẽ có vấn đề. Nên hash body!
-		// Ví dụ hash body:
-		// bodyHasher := sha256.New()
-		// bodyHasher.Write(bodyBytes)
-		// bodyString = hex.EncodeToString(bodyHasher.Sum(nil))
+		bodyHasher := sha256.New()
+		bodyHasher.Write(bodyBytes)
+		bodyHash = hex.EncodeToString(bodyHasher.Sum(nil))
 	}
 
 	// Thứ tự phải nhất quán giữa client và server
-	// Ví dụ: METHOD\nPATH\nTIMESTAMP\nSORTED_QUERY_STRING\nBODY_STRING_OR_HASH
+	// Ví dụ: METHOD\nPATH\nTIMESTAMP\nSORTED_QUERY_STRING\nBODY_HASH
 	parts := []string{
 		method,
 		path,
 		requestTimeStr,
 		canonicalQueryString,
-		bodyString, // Hoặc hash của body
+		bodyHash,
 	}
 	return strings.Join(parts, "\n")
 }

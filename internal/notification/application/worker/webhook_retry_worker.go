@@ -7,6 +7,8 @@ import (
 	"CONVERDA/global"
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/domain/repository"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -51,7 +53,7 @@ func (w *WebhookRetryWorker) Run(ctx context.Context) {
 func (w *WebhookRetryWorker) processRetries(ctx context.Context) {
 	logs, err := w.logRepo.GetPendingRetries(ctx, retryBatchSize)
 	if err != nil {
-		global.Logger.Error("Webhook Retry Worker: failed to fetch pending retries: " + err.Error())
+		global.Logger.Error("Webhook Retry Worker: failed to fetch pending retries", zap.Error(err))
 		return
 	}
 
@@ -59,7 +61,7 @@ func (w *WebhookRetryWorker) processRetries(ctx context.Context) {
 		return
 	}
 
-	global.Logger.Info("Webhook Retry Worker: processing " + string(rune('0'+len(logs))) + " pending retries")
+	global.Logger.Info("Webhook Retry Worker: processing pending retries", zap.Int("count", len(logs)))
 
 	for _, log := range logs {
 		w.dispatcher.RetryWebhook(ctx, log)

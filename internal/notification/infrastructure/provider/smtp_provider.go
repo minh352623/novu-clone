@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/smtp"
+	"strings"
 )
 
 type SmtpConfig struct {
@@ -49,11 +50,16 @@ func (p *SmtpProvider) Send(ctx context.Context, to, subject, body string) error
 	header["MIME-Version"] = "1.0"
 	header["Content-Type"] = "text/html; charset=\"utf-8\""
 
-	message := ""
+	var builder strings.Builder
 	for k, v := range header {
-		message += fmt.Sprintf("%s: %s\r\n", k, v)
+		builder.WriteString(k)
+		builder.WriteString(": ")
+		builder.WriteString(v)
+		builder.WriteString("\r\n")
 	}
-	message += "\r\n" + body
+	builder.WriteString("\r\n")
+	builder.WriteString(body)
+	message := builder.String()
 
 	if p.config.Encryption == "ssl" {
 		return p.sendWithSSL(addr, auth, p.config.FromEmail, []string{to}, []byte(message))

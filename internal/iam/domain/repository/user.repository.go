@@ -16,11 +16,8 @@ type UserFilters struct {
 	Offset      int
 }
 
-// UserRepository defines the interface for user persistence
-type UserRepository interface {
-	// Create creates a new user
-	Create(ctx context.Context, user *entity.User) (*entity.User, error)
-
+// UserReader defines read operations for users
+type UserReader interface {
 	// GetByID retrieves a user by ID
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.User, error)
 
@@ -33,6 +30,15 @@ type UserRepository interface {
 	// CountAll counts all users with filters
 	CountAll(ctx context.Context, filters UserFilters) (int64, error)
 
+	// ExistsByEmail checks if a user with the given email exists
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
+}
+
+// UserWriter defines write operations for users
+type UserWriter interface {
+	// Create creates a new user
+	Create(ctx context.Context, user *entity.User) (*entity.User, error)
+
 	// Update updates a user
 	Update(ctx context.Context, user *entity.User) error
 
@@ -44,7 +50,10 @@ type UserRepository interface {
 
 	// UpdatePassword updates the user's password hash
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+}
 
-	// ExistsByEmail checks if a user with the given email exists
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
+// UserRepository defines the interface for user persistence by combining reader and writer
+type UserRepository interface {
+	UserReader
+	UserWriter
 }

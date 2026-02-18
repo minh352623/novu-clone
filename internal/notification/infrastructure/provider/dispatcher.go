@@ -10,6 +10,7 @@ import (
 	"CONVERDA/internal/notification/domain/repository"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type EmailProvider interface {
@@ -43,7 +44,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, envID uuid.UUID, channel, rec
 	if err != nil {
 		// Fallback to default or error?
 		// For now, if no config, we log and simulate success (or error)
-		global.Logger.Warn("Dispatcher: no provider config for " + channel + " in env " + envID.String() + ": " + err.Error())
+		global.Logger.Warn("Dispatcher: no provider config", zap.String("channel", channel), zap.String("envID", envID.String()), zap.Error(err))
 		return fmt.Errorf("provider not configured for channel %s", channel)
 	}
 
@@ -68,7 +69,7 @@ func (d *Dispatcher) sendEmail(ctx context.Context, config *entity.ProviderConfi
 		return fmt.Errorf("failed to init smtp provider: %w", err)
 	}
 
-	global.Logger.Info("SMTP: dispatching email to " + recipient)
+	global.Logger.Info("SMTP: dispatching email", zap.String("recipient", recipient))
 	return p.Send(ctx, recipient, subject, body)
 }
 
