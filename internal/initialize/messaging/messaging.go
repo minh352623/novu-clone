@@ -28,6 +28,7 @@ func InitMessagingModule(v1 *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Ha
 	memberRepo := iamRepo.NewTenantMemberRepository(db)
 	appRepo := appsRepo.NewAppRepository(db)
 	envRepo := appsRepo.NewEnvironmentRepository(db)
+	messagingUoW := repository.NewMessagingUnitOfWork(db)
 
 	// Adapters
 	appReader := adapter.NewLocalAppAdapter(appRepo, envRepo)
@@ -38,7 +39,7 @@ func InitMessagingModule(v1 *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Ha
 	go hub.Run()
 
 	// Services
-	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberReader, appReader, hub)
+	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberReader, appReader, hub, messagingUoW)
 
 	slaWorker := worker.NewSLAWorker(threadRepo, logRepo, appReader)
 	go slaWorker.Run(context.Background())

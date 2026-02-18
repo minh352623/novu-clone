@@ -9,7 +9,6 @@ import (
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 const (
@@ -51,7 +50,7 @@ func APIKeyMiddleware(apiKeyService service.APIKeyService, metricsService servic
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					global.Logger.Error("api_key_middleware: panic recovered in RecordUsage", zap.Any("panic", r))
+					global.Logger.Error("api_key_middleware: panic recovered in RecordUsage", "panic", r)
 				}
 			}()
 

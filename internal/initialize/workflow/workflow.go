@@ -21,6 +21,7 @@ func InitWorkflowModule(db *gorm.DB, router *gin.RouterGroup, authMiddleware gin
 	// Repositories
 	workflowRepo := infraRepo.NewWorkflowRepository(db)
 	execRepo := infraRepo.NewExecutionRepository(db)
+	uow := infraRepo.NewWorkflowUnitOfWork(db)
 
 	// Adapters
 	notifier := adapter.NewLocalNotifierAdapter(notifInit.NotificationService)
@@ -32,7 +33,7 @@ func InitWorkflowModule(db *gorm.DB, router *gin.RouterGroup, authMiddleware gin
 
 	// Services
 	workflowService := impl.NewWorkflowService(workflowRepo)
-	triggerService := impl.NewTriggerService(workflowRepo, execRepo, channelHandler, delayHandler)
+	triggerService := impl.NewTriggerService(workflowRepo, execRepo, uow, channelHandler, delayHandler)
 
 	// Controller
 	wfController := controller.NewWorkflowController(workflowService, triggerService)

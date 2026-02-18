@@ -14,7 +14,6 @@ import (
 	"CONVERDA/internal/notification/infrastructure/provider"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 type notificationServiceImpl struct {
@@ -64,7 +63,7 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	// 3. Create Notification Record (Pending)
 	dataBytes, err := json.Marshal(req.Data)
 	if err != nil {
-		global.Logger.Warn("notification_service: failed to marshal notification data", zap.Error(err))
+		global.Logger.Warn("notification_service: failed to marshal notification data", "error", err)
 	}
 	notif := entity.NewNotification(tenantID, envID, req.TemplateCode, req.Recipient, req.Channel, dataBytes)
 
@@ -94,7 +93,7 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	notif.UpdatedAt = now
 
 	if err := s.notifRepo.Update(ctx, notif); err != nil {
-		global.Logger.Error("notification_service: failed to update notification status", zap.String("notificationID", notif.ID.String()), zap.Error(err))
+		global.Logger.Error("notification_service: failed to update notification status", "notificationID", notif.ID.String(), "error", err)
 	}
 
 	if dispatchErr != nil {

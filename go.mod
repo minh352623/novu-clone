@@ -20,7 +20,6 @@ require (
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.4
-	go.uber.org/zap v1.27.1
 	google.golang.org/api v0.266.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0

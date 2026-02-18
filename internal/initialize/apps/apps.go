@@ -22,6 +22,7 @@ func InitAppsModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Han
 	apiKeyRepo := repository.NewAPIKeyRepository(db)
 	metricsRepo := repository.NewUsageMetricRepository(db)
 	systemEnvRepo := repository.NewSystemEnvironmentRepository(db)
+	appsUoW := repository.NewAppsUnitOfWork(db)
 
 	// Repositories (IAM - for membership checking)
 	memberRepo := iamRepository.NewTenantMemberRepository(db)
@@ -33,7 +34,7 @@ func InitAppsModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Han
 	apiKeyService := impl.NewAPIKeyService(apiKeyRepo, envRepo)
 
 	// AppService depends on SystemEnv and APIKey services
-	appService := impl.NewAppService(appRepo, envRepo, systemEnvService, apiKeyService)
+	appService := impl.NewAppService(appRepo, envRepo, systemEnvService, apiKeyService, appsUoW)
 
 	webhookService := impl.NewWebhookService(webhookRepo)
 	providerService := impl.NewProviderService(providerRepo)

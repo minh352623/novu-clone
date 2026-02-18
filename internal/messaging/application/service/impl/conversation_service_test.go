@@ -209,6 +209,30 @@ func (m *MockMemberReader) GetMember(ctx context.Context, id uuid.UUID) (*reposi
 	return args.Get(0).(*repository.MemberInfo), args.Error(1)
 }
 
+// --- Test Helpers for Unit of Work ---
+
+type TestMessagingUnitOfWork struct {
+	tx domainRepo.MessagingTxRepository
+}
+
+func (u *TestMessagingUnitOfWork) Execute(ctx context.Context, fn func(domainRepo.MessagingTxRepository) error) error {
+	return fn(u.tx)
+}
+
+type TestMessagingTxRepository struct {
+	msgRepo        domainRepo.MessageRepository
+	threadRepo     domainRepo.ThreadRepository
+	subRepo        domainRepo.SubscriberRepository
+	assignmentLogs domainRepo.AssignmentLogRepository
+}
+
+func (r *TestMessagingTxRepository) Messages() domainRepo.MessageRepository       { return r.msgRepo }
+func (r *TestMessagingTxRepository) Threads() domainRepo.ThreadRepository         { return r.threadRepo }
+func (r *TestMessagingTxRepository) Subscribers() domainRepo.SubscriberRepository { return r.subRepo }
+func (r *TestMessagingTxRepository) AssignmentLogs() domainRepo.AssignmentLogRepository {
+	return r.assignmentLogs
+}
+
 // --- Tests ---
 
 func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
@@ -224,7 +248,15 @@ func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
 	mockMemberReader := new(MockMemberReader)
 	mockAppReader := new(MockAppReader)
 
-	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo, mockMemberReader, mockAppReader, nil)
+	tx := &TestMessagingTxRepository{
+		msgRepo:        mockMsgRepo,
+		threadRepo:     mockThreadRepo,
+		subRepo:        mockSubRepo,
+		assignmentLogs: mockLogRepo,
+	}
+	uow := &TestMessagingUnitOfWork{tx: tx}
+
+	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo, mockMemberReader, mockAppReader, nil, uow)
 
 	t.Run("creates new thread between user and subscriber", func(t *testing.T) {
 		// Mock: Create thread succeeds
@@ -282,7 +314,15 @@ func TestConversationService_CreateGroupThread(t *testing.T) {
 	mockMemberReader := new(MockMemberReader)
 	mockAppReader := new(MockAppReader)
 
-	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo, mockMemberReader, mockAppReader, nil)
+	tx := &TestMessagingTxRepository{
+		msgRepo:        mockMsgRepo,
+		threadRepo:     mockThreadRepo,
+		subRepo:        mockSubRepo,
+		assignmentLogs: mockLogRepo,
+	}
+	uow := &TestMessagingUnitOfWork{tx: tx}
+
+	service := impl.NewConversationService(mockMsgRepo, mockThreadRepo, mockSubRepo, mockLogRepo, mockMemberReader, mockAppReader, nil, uow)
 
 	t.Run("creates group with mixed participants", func(t *testing.T) {
 		participants := []*entity.ThreadParticipant{

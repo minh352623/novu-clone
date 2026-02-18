@@ -27,3 +27,30 @@ swag:
 .PHONY: dev downse upse resetse up_by_one create_migration sql_gen swag
 
 .PHONY: air
+
+# V2.0 Standard Commands
+.PHONY: lint test test-race bench tidy check
+
+## Run linter
+lint:
+	golangci-lint run ./...
+
+## Run all unit tests
+test:
+	go test ./... -v -count=1
+
+## Run tests with race detector
+test-race:
+	go test -race ./... -count=1
+
+## Run benchmarks
+bench:
+	go test -bench=. -benchmem -count=5 ./...
+
+## Tidy dependencies
+tidy:
+	go mod tidy
+	go mod verify
+
+## Run all checks before push
+check: tidy lint test-race

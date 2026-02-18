@@ -9,6 +9,7 @@ import (
 	"CONVERDA/global"
 	"CONVERDA/internal/workflow/application/service/impl"
 	"CONVERDA/internal/workflow/domain/model/entity"
+	domainRepo "CONVERDA/internal/workflow/domain/repository"
 	"CONVERDA/pkg/logger"
 	"CONVERDA/pkg/setting"
 
@@ -117,6 +118,26 @@ func (m *mockExecRepo) GetDigestingSteps(ctx context.Context, limit int) ([]*ent
 	return args.Get(0).([]*entity.StepExecution), args.Error(1)
 }
 
+// === UoW Mocks ===
+
+type mockWorkflowTxRepository struct {
+	mock.Mock
+	MockExecRepo *mockExecRepo
+}
+
+func (m *mockWorkflowTxRepository) Executions() domainRepo.ExecutionRepository {
+	return m.MockExecRepo
+}
+
+type mockWorkflowUow struct {
+	mock.Mock
+	TxRepo domainRepo.WorkflowTxRepository
+}
+
+func (m *mockWorkflowUow) Execute(ctx context.Context, fn func(repo domainRepo.WorkflowTxRepository) error) error {
+	return fn(m.TxRepo)
+}
+
 type mockStepHandler struct {
 	mock.Mock
 }
@@ -135,6 +156,7 @@ func TestTriggerService_Trigger_ChannelStep(t *testing.T) {
 
 	wfRepo := new(mockWorkflowRepo)
 	execRepo := new(mockExecRepo)
+	uow := &mockWorkflowUow{TxRepo: &mockWorkflowTxRepository{MockExecRepo: execRepo}}
 	channelHandler := new(mockStepHandler)
 	delayHandler := new(mockStepHandler)
 
@@ -160,7 +182,7 @@ func TestTriggerService_Trigger_ChannelStep(t *testing.T) {
 	execRepo.On("UpdateStepExecution", ctx, mock.Anything).Return(nil)
 	channelHandler.On("Execute", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	svc := impl.NewTriggerService(wfRepo, execRepo, channelHandler, delayHandler)
+	svc := impl.NewTriggerService(wfRepo, execRepo, uow, channelHandler, delayHandler)
 	err := svc.Trigger(ctx, envID, "user.signup", "user-123", map[string]interface{}{"name": "John"})
 
 	assert.NoError(t, err)

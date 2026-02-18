@@ -9,7 +9,6 @@ import (
 	domainRepo "CONVERDA/internal/messaging/domain/repository"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 const (
@@ -49,7 +48,14 @@ func (w *SLAWorker) Run(ctx context.Context) {
 			global.Logger.Info("SLA Worker stopping")
 			return
 		case <-ticker.C:
-			w.checkSLA(ctx)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						global.Logger.Error("SLA Worker: panic recovered", "panic", r)
+					}
+				}()
+				w.checkSLA(ctx)
+			}()
 		}
 	}
 }
@@ -76,16 +82,16 @@ func (w *SLAWorker) internalCheckSLA(ctx context.Context) {
 				Offset:    offset,
 			})
 			if err != nil {
-				global.Logger.Error("SLA Worker: failed to list threads", zap.String("status", status), zap.Error(err))
+				global.Logger.Error("SLA Worker: failed to list threads", "status", status, "error", err)
 				break
 			}
 
 			for _, t := range threads {
 				if w.isThreadOverdue(ctx, t) {
 					if err := w.threadRepo.MarkAsOverdue(ctx, t.ID); err != nil {
-						global.Logger.Error("SLA Worker: failed to mark thread as overdue", zap.String("threadID", t.ID.String()), zap.Error(err))
+						global.Logger.Error("SLA Worker: failed to mark thread as overdue", "threadID", t.ID.String(), "error", err)
 					} else {
-						global.Logger.Info("SLA Worker: thread marked as overdue", zap.String("threadID", t.ID.String()))
+						global.Logger.Info("SLA Worker: thread marked as overdue", "threadID", t.ID.String())
 					}
 				}
 			}

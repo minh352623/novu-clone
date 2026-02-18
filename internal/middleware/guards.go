@@ -18,7 +18,6 @@ import (
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 const SHARED_SECRET_KEY = "your-very-secret-and-long-key" // !!! in env
@@ -57,7 +56,7 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		if ctx.Request.Body != nil {
 			bodyBytes, err = io.ReadAll(ctx.Request.Body)
 			if err != nil {
-				global.Logger.Error("HMAC Auth: error reading request body", zap.Error(err))
+				global.Logger.Error("HMAC Auth: error reading request body", "error", err)
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, response.NewAPIError(http.StatusInternalServerError, "Server Error", "Could not read request body"))
 				return
 			}
@@ -66,11 +65,11 @@ func AuthGuardMiddlewareWithHMAC() gin.HandlerFunc {
 		}
 
 		stringToSign := buildStringToSign(ctx, requestTimeStr, bodyBytes)
-		global.Logger.Info("HMAC Auth: server StringToSign", zap.String("content", strings.ReplaceAll(stringToSign, "\n", "\\n")))
+		global.Logger.Info("HMAC Auth: server StringToSign", "content", strings.ReplaceAll(stringToSign, "\n", "\\n"))
 
 		// 3. Tính toán HMAC phía server
 		serverSign := calculateHMAC(stringToSign, SHARED_SECRET_KEY)
-		global.Logger.Info("HMAC Auth: verification", zap.String("clientSign", clientSign), zap.String("serverSign", serverSign))
+		global.Logger.Info("HMAC Auth: verification", "clientSign", clientSign, "serverSign", serverSign)
 
 		// 4. So sánh chữ ký
 		// Sử dụng hmac.Equal để so sánh an toàn, chống timing attacks

@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"CONVERDA/global"
 	"sync"
 	"time"
 )
@@ -29,6 +30,11 @@ func NewMemoryRateLimiter(cleanupInterval time.Duration) *MemoryRateLimiter {
 	go func() {
 		ticker := time.NewTicker(cleanupInterval)
 		defer ticker.Stop()
+		defer func() {
+			if r := recover(); r != nil {
+				global.Logger.Error("ratelimit: panic recovered in cleanup", "panic", r)
+			}
+		}()
 		for {
 			select {
 			case <-ticker.C:

@@ -1,58 +1,98 @@
 package logger
 
 import (
+	"context"
+	"io"
+	"log/slog"
 	"os"
+	"time"
 
 	"CONVERDA/pkg/setting"
 
 	"github.com/natefinch/lumberjack"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
-type LoggerZap struct {
-	*zap.Logger
+type Logger struct {
+	*slog.Logger
 }
 
-func NewLogger(config setting.LoggerSetting) *LoggerZap {
-	logLevel := config.LogLevel
-
-	var level zapcore.Level
-	switch logLevel {
+func NewLogger(config setting.LoggerSetting) *Logger {
+	var level slog.Level
+	switch config.LogLevel {
 	case "debug":
-		level = zap.DebugLevel
+		level = slog.LevelDebug
 	case "info":
-		level = zap.InfoLevel
+		level = slog.LevelInfo
 	case "warn":
-		level = zap.WarnLevel
+		level = slog.LevelWarn
 	case "error":
-		level = zap.ErrorLevel
+		level = slog.LevelError
 	default:
-		level = zap.InfoLevel
+		level = slog.LevelInfo
 	}
 
-	encoder := getEncoderLog()
-	hook := lumberjack.Logger{
+	hook := &lumberjack.Logger{
 		Filename:   config.LogFileName,
 		MaxSize:    config.MaxSize, // megabytes
 		MaxBackups: config.MaxBackups,
-		MaxAge:     config.MaxAge,   //days
+		MaxAge:     config.MaxAge,   // days
 		Compress:   config.Compress, // disabled by default
 	}
 
-	core := zapcore.NewCore(
-		encoder,
-		zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), zapcore.AddSync(&hook)),
-		level)
+	opts := &slog.HandlerOptions{
+		Level: level,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				// Use ISO8601-like format
+				return slog.Attr{
+					Key:   "time",
+					Value: slog.StringValue(a.Value.Time().Format(time.RFC3339)),
+				}
+			}
+			return a
+		},
+	}
 
-	return &LoggerZap{zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))}
+	// Multi-writer for stdout and file
+	multiWriter := io.MultiWriter(os.Stdout, hook)
+	handler := slog.NewJSONHandler(multiWriter, opts)
+
+	return &Logger{slog.New(handler)}
 }
 
-func getEncoderLog() zapcore.Encoder {
-	encodeConfig := zap.NewProductionEncoderConfig()
-	encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encodeConfig.TimeKey = "time"
-	encodeConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	encodeConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	return zapcore.NewJSONEncoder(encodeConfig)
+// Info logs with info level (compatibility helper if needed, but slog has it)
+func (l *Logger) Info(msg string, args ...any) {
+	l.Logger.Info(msg, args...)
+}
+
+// Error logs with error level
+func (l *Logger) Error(msg string, args ...any) {
+	l.Logger.Error(msg, args...)
+}
+
+// Warn logs with warn level
+func (l *Logger) Warn(msg string, args ...any) {
+	l.Logger.Warn(msg, args...)
+}
+
+// Debug logs with debug level
+func (l *Logger) Debug(msg string, args ...any) {
+	l.Logger.Debug(msg, args...)
+}
+
+// Fatal logs with error level and exits
+func (l *Logger) Fatal(msg string, args ...any) {
+	l.Logger.Error(msg, args...)
+	os.Exit(1)
+}
+
+// With wraps slog.With
+func (l *Logger) With(args ...any) *Logger {
+	return &Logger{l.Logger.With(args...)}
+}
+
+// WithContext wraps for future context-based logging if needed
+func (l *Logger) WithContext(ctx context.Context) *Logger {
+	// For now just return self, can be expanded to extract trace IDs etc
+	return l
 }

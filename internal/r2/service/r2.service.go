@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"go.uber.org/zap"
 )
 
 // R2Service interface for R2 operations
@@ -90,7 +89,7 @@ func (s *r2Service) UploadFileBase64(ctx context.Context, images []dto.ImageDTO)
 			defer wg.Done()
 			defer func() {
 				if r := recover(); r != nil {
-					global.Logger.Error("r2_service: panic recovered in UploadFileBase64 goroutine", zap.Any("panic", r), zap.String("key", image.Key))
+					global.Logger.Error("r2_service: panic recovered in UploadFileBase64 goroutine", "panic", r, "key", image.Key)
 
 					// Record failure for this item
 					mu.Lock()
@@ -108,7 +107,8 @@ func (s *r2Service) UploadFileBase64(ctx context.Context, images []dto.ImageDTO)
 				Key: image.Key,
 			}
 
-			url, err := s.UploadSingleFileBase64(ctx, image.Key, image.Base64)
+			asyncCtx := context.WithoutCancel(ctx)
+			url, err := s.UploadSingleFileBase64(asyncCtx, image.Key, image.Base64)
 			if err != nil {
 				result.Success = false
 				result.Error = err.Error()

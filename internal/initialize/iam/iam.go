@@ -8,7 +8,6 @@ import (
 	"CONVERDA/internal/iam/infrastructure/persistence/repository"
 	"CONVERDA/internal/middleware"
 
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
@@ -24,16 +23,17 @@ func InitIAMModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Hand
 	invitationRepo := repository.NewInvitationRepository(db)
 	tenantRepo := repository.NewTenantRepository(db)
 	pricingPlanRepo := repository.NewPricingPlanRepository(db)
+	iamUoW := repository.NewIAMUnitOfWork(db)
 
 	// Initialize services
 	emailService, err := email.NewSESEmailService(global.Config.SES)
 	if err != nil {
-		global.Logger.Fatal("Failed to initialize SES email service", zap.Error(err))
+		global.Logger.Fatal("Failed to initialize SES email service", "error", err)
 	}
 
 	authService := impl.NewAuthService(userRepo)
 	tenantService := impl.NewTenantService(tenantRepo, memberRepo, roleRepo, pricingPlanRepo)
-	memberService := impl.NewMemberService(memberRepo, roleRepo, tenantRepo, invitationRepo, userRepo, emailService)
+	memberService := impl.NewMemberService(memberRepo, roleRepo, tenantRepo, invitationRepo, userRepo, emailService, iamUoW)
 	roleService := impl.NewRoleService(roleRepo)
 	pricingPlanService := impl.NewPricingPlanService(pricingPlanRepo)
 	tokenService := impl.NewTokenService()

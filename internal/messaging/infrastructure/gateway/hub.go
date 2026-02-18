@@ -8,7 +8,6 @@ import (
 	"CONVERDA/global"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -50,7 +49,7 @@ func NewHub() *Hub {
 func (h *Hub) Run() {
 	defer func() {
 		if r := recover(); r != nil {
-			global.Logger.Error("ws_hub: panic recovered in Hub.Run", zap.Any("panic", r))
+			global.Logger.Error("ws_hub: panic recovered in Hub.Run", "panic", r)
 			// Restart the Hub if it crashes
 			go h.Run()
 		}
@@ -172,7 +171,7 @@ func (h *Hub) HandleInbound(sender *Client, event *WsInboundEvent) {
 	case EventTypeTypingStart, EventTypeTypingStop:
 		h.handleTyping(sender, event)
 	default:
-		global.Logger.Warn("ws: unknown inbound event type", zap.String("type", string(event.Type)), zap.String("userID", sender.UserID.String()))
+		global.Logger.Warn("ws: unknown inbound event type", "type", string(event.Type), "userID", sender.UserID.String())
 	}
 }
 

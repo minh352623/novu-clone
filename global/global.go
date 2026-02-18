@@ -12,7 +12,7 @@ import (
 
 var (
 	Config setting.Config
-	Logger *logger.LoggerZap
+	Logger *logger.Logger
 	Http   *http.Client = &http.Client{}
 	Pdbc   *sql.DB
 	GormDB *gorm.DB

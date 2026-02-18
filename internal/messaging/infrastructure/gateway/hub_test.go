@@ -8,14 +8,14 @@ import (
 	"CONVERDA/global"
 	"CONVERDA/pkg/logger"
 
+	"CONVERDA/pkg/setting"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 func init() {
-	z, _ := zap.NewDevelopment()
-	global.Logger = &logger.LoggerZap{Logger: z}
+	global.Logger = logger.NewLogger(setting.LoggerSetting{LogLevel: "debug"})
 }
 
 func newTestHub() *Hub {

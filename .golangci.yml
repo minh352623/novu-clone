@@ -1,0 +1,39 @@
+# .golangci.yml — standard project linter configuration
+run:
+  timeout: 5m
+  go: "1.21"
+
+linters:
+  enable:
+    - errcheck       # Detect ignored errors
+    - gosec          # Security analysis
+    - govet          # Standard go vet
+    - staticcheck    # Advanced static analysis
+    - unused         # Detect unused code
+    - gofumpt        # Strict formatter
+    - noctx          # Detect HTTP calls without context
+    - bodyclose      # Detect unclosed HTTP response bodies
+    - gocritic       # Style and performance checks
+    - exhaustive     # Ensure enum switches are exhaustive
+    - misspell       # Spelling checks
+    - prealloc       # Suggest slice pre-allocation
+    - revive         # Enhanced golint
+    - whitespace     # Whitespace checks
+
+linters-settings:
+  gosec:
+    excludes:
+      - G104  # Allow ignoring errors in defer (where commented)
+  govet:
+    enable-all: true
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+  max-issues-per-linter: 0
+  max-same-issues: 0

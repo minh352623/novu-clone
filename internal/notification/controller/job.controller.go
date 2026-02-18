@@ -13,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 type JobController struct {
@@ -68,7 +67,7 @@ func (c *JobController) ScheduleJob(ctx *gin.Context) (interface{}, error) {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					global.Logger.Error("job_controller: panic recovered in background processing", zap.Any("panic", r), zap.String("jobID", job.ID.String()))
+					global.Logger.Error("job_controller: panic recovered in background processing", "panic", r, "jobID", job.ID.String())
 				}
 			}()
 			// Create a background context with timeout?

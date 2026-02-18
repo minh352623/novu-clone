@@ -14,15 +14,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 
 	"CONVERDA/global"
 	"CONVERDA/pkg/logger"
+	"CONVERDA/pkg/setting"
 )
 
 func init() {
-	z, _ := zap.NewDevelopment()
-	global.Logger = &logger.LoggerZap{Logger: z}
+	global.Logger = logger.NewLogger(setting.LoggerSetting{LogLevel: "debug"})
 }
 
 func TestAuthGuardMiddlewareWithHMAC(t *testing.T) {

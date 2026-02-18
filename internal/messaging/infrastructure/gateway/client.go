@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"go.uber.org/zap"
 )
 
 const (
@@ -56,6 +55,9 @@ type Client struct {
 // readPump pumps messages from the websocket connection to the hub.
 func (c *Client) readPump() {
 	defer func() {
+		if r := recover(); r != nil {
+			global.Logger.Error("ws: panic recovered in readPump", "panic", r, "userID", c.UserID.String())
+		}
 		c.Hub.unregister <- c
 		c.conn.Close()
 	}()
@@ -66,7 +68,7 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				global.Logger.Warn("ws: unexpected close error", zap.Error(err))
+				global.Logger.Warn("ws: unexpected close error", "error", err)
 			}
 			break
 		}
@@ -74,7 +76,7 @@ func (c *Client) readPump() {
 		// Parse inbound event and forward to hub for processing
 		var event WsInboundEvent
 		if err := json.Unmarshal(message, &event); err != nil {
-			global.Logger.Warn("ws: invalid inbound message", zap.String("userID", c.UserID.String()), zap.Error(err))
+			global.Logger.Warn("ws: invalid inbound message", "userID", c.UserID.String(), "error", err)
 			continue
 		}
 
@@ -86,6 +88,9 @@ func (c *Client) readPump() {
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+		if r := recover(); r != nil {
+			global.Logger.Error("ws: panic recovered in writePump", "panic", r, "userID", c.UserID.String())
+		}
 		ticker.Stop()
 		c.conn.Close()
 	}()
@@ -127,7 +132,7 @@ func (c *Client) writePump() {
 func ServeWs(hub *Hub, c *gin.Context, userID uuid.UUID, envID uuid.UUID) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		global.Logger.Error("ws: failed to upgrade connection", zap.Error(err))
+		global.Logger.Error("ws: failed to upgrade connection", "error", err)
 		return
 	}
 	client := &Client{Hub: hub, conn: conn, send: make(chan []byte, 256), UserID: userID, EnvironmentID: envID}

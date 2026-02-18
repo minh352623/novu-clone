@@ -1,7 +1,11 @@
 package entity
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -113,4 +117,31 @@ func (k *APIKey) Revoke() {
 	now := time.Now()
 	k.RevokedAt = &now
 	k.UpdatedAt = now
+}
+
+// GenerateAPIKey generates a new plain key and its hashed version for an environment
+func GenerateAPIKey(appID, envID uuid.UUID, envCode, name string) (string, *APIKey, error) {
+	prefix := "sk_test_"
+	if envCode == "prod" || envCode == "production" {
+		prefix = "sk_live_"
+	}
+
+	// Generate Random Key
+	randomBytes := make([]byte, 24)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", nil, fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	secret := hex.EncodeToString(randomBytes)
+	plainKey := prefix + secret
+
+	// Hash the key
+	sum := sha256.Sum256([]byte(plainKey))
+	keyHash := hex.EncodeToString(sum[:])
+
+	suffix := ""
+	if len(plainKey) > 4 {
+		suffix = plainKey[len(plainKey)-4:]
+	}
+
+	return plainKey, NewAPIKey(appID, envID, name, prefix, suffix, keyHash, nil), nil
 }

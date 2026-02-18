@@ -9,7 +9,6 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
-	"go.uber.org/zap"
 	"google.golang.org/api/option"
 )
 
@@ -62,7 +61,7 @@ func (p *fcmProvider) Send(ctx context.Context, to, subject, body string, data m
 		return fmt.Errorf("failed to send fcm message: %w", err)
 	}
 
-	global.Logger.Info("FCM: successfully sent push notification", zap.String("response", response))
+	global.Logger.Info("FCM: successfully sent push notification", "response", response)
 	return nil
 }
 
@@ -70,7 +69,7 @@ func (p *fcmProvider) Send(ctx context.Context, to, subject, body string, data m
 type mockFcmProvider struct{}
 
 func (p *mockFcmProvider) Send(ctx context.Context, to, subject, body string, data map[string]string) error {
-	global.Logger.Info("FCM-MOCK: sending push", zap.String("to", to))
-	global.Logger.Info("FCM-MOCK: push content", zap.String("title", subject), zap.String("body", body))
+	global.Logger.Info("FCM-MOCK: sending push", "to", to)
+	global.Logger.Info("FCM-MOCK: push content", "title", subject, "body", body)
 	return nil
 }

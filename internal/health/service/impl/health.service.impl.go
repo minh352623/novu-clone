@@ -10,7 +10,6 @@ import (
 	"CONVERDA/internal/health/service"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 // QueueReader provides read access to the messaging queue state.
@@ -55,21 +54,21 @@ func (s *healthServiceImpl) GetSystemHealth(ctx context.Context, envID uuid.UUID
 	// 1. Queue Health
 	queueHealth, err := s.buildQueueHealth(ctx, envID)
 	if err != nil {
-		global.Logger.Error("health_service: failed to build queue health", zap.Error(err), zap.String("environmentID", envID.String()))
+		global.Logger.Error("health_service: failed to build queue health", "error", err, "environmentID", envID.String())
 		return nil, fmt.Errorf("failed to build queue health: %w", err)
 	}
 
 	// 2. SLA Compliance
 	sla, err := s.slaReader.GetSLACompliance(ctx, envID, s.slaThreshold, from, to)
 	if err != nil {
-		global.Logger.Error("health_service: failed to fetch SLA compliance", zap.Error(err), zap.String("environmentID", envID.String()))
+		global.Logger.Error("health_service: failed to fetch SLA compliance", "error", err, "environmentID", envID.String())
 		return nil, fmt.Errorf("failed to fetch SLA compliance: %w", err)
 	}
 
 	// 3. Webhook Health
 	wh, err := s.webhookReader.GetHealthStats(ctx, from, to)
 	if err != nil {
-		global.Logger.Error("health_service: failed to fetch webhook health", zap.Error(err), zap.String("environmentID", envID.String()))
+		global.Logger.Error("health_service: failed to fetch webhook health", "error", err, "environmentID", envID.String())
 		return nil, fmt.Errorf("failed to fetch webhook health: %w", err)
 	}
 

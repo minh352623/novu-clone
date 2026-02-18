@@ -11,7 +11,6 @@ import (
 	"CONVERDA/internal/iam/domain/repository"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 // memberServiceImpl implements MemberService
@@ -22,6 +21,7 @@ type memberServiceImpl struct {
 	invitationRepo repository.InvitationRepository
 	userRepo       repository.UserRepository
 	emailService   service.EmailService
+	uow            repository.IAMUnitOfWork
 }
 
 // NewMemberService creates a new MemberService
@@ -32,6 +32,7 @@ func NewMemberService(
 	invitationRepo repository.InvitationRepository,
 	userRepo repository.UserRepository,
 	emailService service.EmailService,
+	uow repository.IAMUnitOfWork,
 ) service.MemberService {
 	return &memberServiceImpl{
 		memberRepo:     memberRepo,
@@ -40,6 +41,7 @@ func NewMemberService(
 		invitationRepo: invitationRepo,
 		userRepo:       userRepo,
 		emailService:   emailService,
+		uow:            uow,
 	}
 }
 
@@ -190,11 +192,14 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				global.Logger.Error("member_service: panic recovered in SendInvitation goroutine", zap.Any("panic", r))
+				global.Logger.Error("member_service: panic recovered in SendInvitation goroutine", "panic", r)
 			}
 		}()
-		if err := s.emailService.SendInvitation(context.Background(), email, createdInvite.Token, roleName, tenantName, inviterName); err != nil {
-			global.Logger.Warn("member_service: failed to send invitation email", zap.String("email", email), zap.Error(err))
+		// Use context.WithoutCancel to ensure email delivery continues even if the original request context is cancelled
+		// but still carries over tracing/correlation context if present.
+		asyncCtx := context.WithoutCancel(ctx)
+		if err := s.emailService.SendInvitation(asyncCtx, email, createdInvite.Token, roleName, tenantName, inviterName); err != nil {
+			global.Logger.Warn("member_service: failed to send invitation email", "email", email, "error", err)
 		}
 	}()
 
@@ -202,42 +207,55 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 }
 
 func (s *memberServiceImpl) AcceptInvitation(ctx context.Context, token string, userID uuid.UUID) (*entity.TenantMember, error) {
-	// 1. Get Invitation
-	invitation, err := s.invitationRepo.GetByToken(ctx, token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get invitation by token: %w", err)
-	}
-	if invitation == nil {
-		return nil, entity.ErrInvalidToken
-	}
+	var createdMember *entity.TenantMember
 
-	// 2. Validate
-	if err := invitation.Accept(); err != nil {
+	err := s.uow.Execute(ctx, func(tx repository.IAMTxRepository) error {
+		// 1. Get Invitation
+		invitation, err := tx.Invitations().GetByToken(ctx, token)
+		if err != nil {
+			return fmt.Errorf("failed to get invitation by token: %w", err)
+		}
+		if invitation == nil {
+			return entity.ErrInvalidToken
+		}
+
+		// 2. Validate
+		if err := invitation.Accept(); err != nil {
+			return err
+		}
+
+		// 3. Check if user is already member
+		exists, err := tx.Members().ExistsByTenantAndUser(ctx, invitation.TenantID, userID)
+		if err != nil {
+			return fmt.Errorf("failed to check membership existence: %w", err)
+		}
+		if exists {
+			// Already member, just close invitation
+			_ = tx.Invitations().Update(ctx, invitation)
+			return entity.ErrMemberAlreadyExists
+		}
+
+		// 4. Create Member
+		member, err := entity.NewTenantMember(invitation.TenantID, userID, invitation.RoleID, invitation.AppID)
+		if err != nil {
+			return err
+		}
+
+		createdMember, err = tx.Members().Create(ctx, member)
+		if err != nil {
+			return fmt.Errorf("failed to create member: %w", err)
+		}
+
+		// 5. Update Invitation Status
+		if err := tx.Invitations().Update(ctx, invitation); err != nil {
+			return fmt.Errorf("failed to update invitation status: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
-	}
-
-	// 3. Check if user is already member
-	exists, err := s.memberRepo.ExistsByTenantAndUser(ctx, invitation.TenantID, userID)
-	if exists {
-		// Already member, just close invitation
-		_ = s.invitationRepo.Update(ctx, invitation)
-		return nil, entity.ErrMemberAlreadyExists
-	}
-
-	// 4. Create Member
-	member, err := entity.NewTenantMember(invitation.TenantID, userID, invitation.RoleID, invitation.AppID)
-	if err != nil {
-		return nil, err
-	}
-
-	createdMember, err := s.memberRepo.Create(ctx, member)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create member: %w", err)
-	}
-
-	// 5. Update Invitation Status
-	if err := s.invitationRepo.Update(ctx, invitation); err != nil {
-		global.Logger.Error("member_service: failed to update invitation status", zap.String("token", token), zap.Error(err))
 	}
 
 	return createdMember, nil

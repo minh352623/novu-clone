@@ -10,7 +10,6 @@ import (
 	"CONVERDA/internal/iam/domain/repository"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 // tenantServiceImpl implements TenantService
@@ -70,7 +69,7 @@ func (s *tenantServiceImpl) CreateTenant(ctx context.Context, name, slug string,
 	if err == nil && adminRole != nil {
 		roleID = &adminRole.ID
 	} else {
-		global.Logger.Warn("CreateTenant: default admin role not found in database", zap.String("roleSlug", string(entity.RoleTenantAdmin)))
+		global.Logger.Warn("CreateTenant: default admin role not found in database", "roleSlug", string(entity.RoleTenantAdmin))
 	}
 
 	// Add owner as admin member

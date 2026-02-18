@@ -12,7 +12,6 @@ import (
 	"CONVERDA/internal/apps/domain/repository"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 type appServiceImpl struct {
@@ -20,6 +19,7 @@ type appServiceImpl struct {
 	envRepo       repository.EnvironmentRepository
 	systemEnvServ service.SystemEnvironmentService
 	apiKeyServ    service.APIKeyService
+	uow           repository.AppsUnitOfWork
 }
 
 func NewAppService(
@@ -27,48 +27,69 @@ func NewAppService(
 	envRepo repository.EnvironmentRepository,
 	systemEnvServ service.SystemEnvironmentService,
 	apiKeyServ service.APIKeyService,
+	uow repository.AppsUnitOfWork,
 ) service.AppService {
 	return &appServiceImpl{
 		appRepo:       appRepo,
 		envRepo:       envRepo,
 		systemEnvServ: systemEnvServ,
 		apiKeyServ:    apiKeyServ,
+		uow:           uow,
 	}
 }
 
 func (s *appServiceImpl) CreateApp(ctx context.Context, tenantID uuid.UUID, name string, description *string, slaThreshold *int) (*entity.App, error) {
-	app, err := entity.NewApp(tenantID, name, description)
-	if slaThreshold != nil {
-		app.SLAThresholdSeconds = *slaThreshold
-	}
+	var createdApp *entity.App
 
-	createdApp, err := s.appRepo.Create(ctx, app)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create app: %w", err)
-	}
-
-	// Auto-create default environments from database
+	// Fetch system environments first (Read-only, before transaction is best, or inside if needed)
 	systemEnvs, err := s.systemEnvServ.ListAll(ctx)
-	if err == nil {
+	if err != nil {
+		global.Logger.Warn("auto-provisioning: failed to fetch system environments", "error", err)
+		// Should we fail or continue? Business decision. Existing code continued with warning.
+		// However, for atomic provisioning, we probably want them.
+	}
+
+	err = s.uow.Execute(ctx, func(tx repository.AppsTxRepository) error {
+		app, err := entity.NewApp(tenantID, name, description)
+		if err != nil {
+			return fmt.Errorf("failed to initialize app: %w", err)
+		}
+		if slaThreshold != nil {
+			app.SLAThresholdSeconds = *slaThreshold
+		}
+
+		createdApp, err = tx.Apps().Create(ctx, app)
+		if err != nil {
+			return fmt.Errorf("failed to create app: %w", err)
+		}
+
+		// Auto-create default environments
 		for _, se := range systemEnvs {
 			env, err := entity.NewEnvironment(createdApp.ID, se.Code)
 			if err != nil {
 				continue
 			}
-			createdEnv, err := s.envRepo.Create(ctx, env)
+			createdEnv, err := tx.Environments().Create(ctx, env)
 			if err != nil {
-				global.Logger.Warn("auto-provisioning: failed to create environment", zap.String("code", se.Code), zap.Error(err))
-				continue
+				return fmt.Errorf("failed to auto-provision environment %s: %w", se.Code, err)
 			}
 
 			// Auto-generate default API Key for the environment
-			_, _, err = s.apiKeyServ.GenerateKey(ctx, createdEnv.ID, "Default Key")
+			_, apiKey, err := entity.GenerateAPIKey(createdApp.ID, createdEnv.ID, se.Code, "Default Key")
 			if err != nil {
-				global.Logger.Warn("auto-provisioning: failed to generate API key", zap.String("code", se.Code), zap.Error(err))
+				return fmt.Errorf("failed to generate default API key for %s: %w", se.Code, err)
+			}
+
+			if _, err := tx.APIKeys().Create(ctx, apiKey); err != nil {
+				return fmt.Errorf("failed to save default API key for %s: %w", se.Code, err)
 			}
 		}
-	} else {
-		global.Logger.Warn("auto-provisioning: failed to fetch system environments", zap.Error(err))
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return createdApp, nil

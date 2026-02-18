@@ -17,7 +17,6 @@ import (
 	"CONVERDA/internal/notification/domain/repository"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 const (
@@ -51,14 +50,14 @@ func (d *webhookDispatcherImpl) Dispatch(ctx context.Context, envID uuid.UUID, e
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				global.Logger.Error("webhook_dispatcher: panic recovered", zap.Any("panic", r), zap.String("eventType", eventType))
+				global.Logger.Error("webhook_dispatcher: panic recovered", "panic", r, "eventType", eventType)
 			}
 		}()
-		bgCtx := context.Background()
+		bgCtx := context.WithoutCancel(ctx)
 
 		webhooks, err := d.webhookRepo.GetByEvent(bgCtx, envID, eventType)
 		if err != nil {
-			global.Logger.Error("webhook_dispatcher: failed to fetch webhooks", zap.String("eventType", eventType), zap.Error(err))
+			global.Logger.Error("webhook_dispatcher: failed to fetch webhooks", "eventType", eventType, "error", err)
 			return
 		}
 
@@ -68,7 +67,7 @@ func (d *webhookDispatcherImpl) Dispatch(ctx context.Context, envID uuid.UUID, e
 
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
-			global.Logger.Error("webhook_dispatcher: failed to marshal payload", zap.Error(err))
+			global.Logger.Error("webhook_dispatcher: failed to marshal payload", "error", err)
 			return
 		}
 
@@ -84,7 +83,7 @@ func (d *webhookDispatcherImpl) Dispatch(ctx context.Context, envID uuid.UUID, e
 func (d *webhookDispatcherImpl) RetryWebhook(ctx context.Context, log *entity.WebhookLog) {
 	payloadBytes, err := json.Marshal(log.RequestPayload)
 	if err != nil {
-		global.Logger.Error("webhook_dispatcher: failed to marshal retry payload", zap.String("logID", log.ID.String()), zap.Error(err))
+		global.Logger.Error("webhook_dispatcher: failed to marshal retry payload", "logID", log.ID.String(), "error", err)
 		return
 	}
 
@@ -116,7 +115,7 @@ func (d *webhookDispatcherImpl) triggerWebhook(ctx context.Context, wh *entity.W
 	}
 
 	if err := d.webhookLogRepo.Create(ctx, logEntry); err != nil {
-		global.Logger.Error("webhook_dispatcher: failed to create log", zap.Error(err))
+		global.Logger.Error("webhook_dispatcher: failed to create log", "error", err)
 	}
 
 	d.sendHTTPRequest(ctx, logEntry, eventType, payloadBytes, wh.Secret)
@@ -169,7 +168,7 @@ func (d *webhookDispatcherImpl) sendHTTPRequest(ctx context.Context, logEntry *e
 	logEntry.NextRetryAt = nil
 
 	if err := d.webhookLogRepo.Update(ctx, logEntry); err != nil {
-		global.Logger.Error("webhook_dispatcher: failed to update log on success", zap.String("logID", logEntry.ID.String()), zap.Error(err))
+		global.Logger.Error("webhook_dispatcher: failed to update log on success", "logID", logEntry.ID.String(), "error", err)
 	}
 }
 
@@ -193,15 +192,15 @@ func (d *webhookDispatcherImpl) handleFailure(ctx context.Context, logEntry *ent
 		logEntry.RetryCount++
 
 		global.Logger.Warn("webhook_dispatcher: scheduling retry",
-			zap.Int("retryCount", logEntry.RetryCount),
-			zap.String("logID", logEntry.ID.String()),
-			zap.Duration("backoff", backoff))
+			"retryCount", logEntry.RetryCount,
+			"logID", logEntry.ID.String(),
+			"backoff", backoff)
 	} else {
-		global.Logger.Error("webhook_dispatcher: max retries reached — dead letter", zap.String("logID", logEntry.ID.String()))
+		global.Logger.Error("webhook_dispatcher: max retries reached — dead letter", "logID", logEntry.ID.String())
 		logEntry.NextRetryAt = nil
 	}
 
 	if err := d.webhookLogRepo.Update(ctx, logEntry); err != nil {
-		global.Logger.Error("webhook_dispatcher: failed to update log on failure", zap.String("logID", logEntry.ID.String()), zap.Error(err))
+		global.Logger.Error("webhook_dispatcher: failed to update log on failure", "logID", logEntry.ID.String(), "error", err)
 	}
 }

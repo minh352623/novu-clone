@@ -17,7 +17,6 @@ import (
 	"CONVERDA/pkg/cursor"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 type conversationServiceImpl struct {
@@ -28,6 +27,7 @@ type conversationServiceImpl struct {
 	memberReader domainRepo.MemberReader
 	appReader    domainRepo.AppReader
 	hub          *gateway.Hub
+	uow          domainRepo.MessagingUnitOfWork
 }
 
 func NewConversationService(
@@ -38,6 +38,7 @@ func NewConversationService(
 	memberReader domainRepo.MemberReader,
 	appReader domainRepo.AppReader,
 	hub *gateway.Hub,
+	uow domainRepo.MessagingUnitOfWork,
 ) service.ConversationService {
 	return &conversationServiceImpl{
 		msgRepo:      msgRepo,
@@ -47,75 +48,87 @@ func NewConversationService(
 		memberReader: memberReader,
 		appReader:    appReader,
 		hub:          hub,
+		uow:          uow,
 	}
 }
 
 func (s *conversationServiceImpl) ReceiveMessage(ctx context.Context, tenantID, envID uuid.UUID, subKey, channel string, content []byte, senderID *uuid.UUID) (*entity.Message, error) {
-	// 1. Find or Create Subscriber
-	sub, err := s.subRepo.GetByKey(ctx, envID, subKey)
-	if err != nil {
-		sub = entity.NewSubscriber(envID, subKey)
-		sub, err = s.subRepo.Create(ctx, sub)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create subscriber: %w", err)
-		}
-	}
+	var createdMsg *entity.Message
 
-	// 2. Find Latest Support Thread for this subscriber
-	supportType := "support"
-	threads, _, err := s.threadRepo.List(ctx, domainRepo.ThreadFilter{
-		EnvironmentID: &envID,
-		Type:          &supportType,
-		MemberID:      &sub.ID,
-		Limit:         1,
+	err := s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
+		// 1. Find or Create Subscriber
+		sub, err := tx.Subscribers().GetByKey(ctx, envID, subKey)
+		if err != nil {
+			sub = entity.NewSubscriber(envID, subKey)
+			sub, err = tx.Subscribers().Create(ctx, sub)
+			if err != nil {
+				return fmt.Errorf("failed to create subscriber: %w", err)
+			}
+		}
+
+		// 2. Find Latest Support Thread for this subscriber
+		supportType := "support"
+		threads, _, err := tx.Threads().List(ctx, domainRepo.ThreadFilter{
+			EnvironmentID: &envID,
+			Type:          &supportType,
+			MemberID:      &sub.ID,
+			Limit:         1,
+		})
+
+		var thread *entity.Thread
+		if len(threads) > 0 {
+			thread = threads[0]
+		}
+
+		if thread == nil {
+			// Create new support thread
+			if channel == "" {
+				channel = "support"
+			}
+			thread = entity.NewThread(envID, "support", channel)
+			thread, err = tx.Threads().Create(ctx, thread)
+			if err != nil {
+				return fmt.Errorf("failed to create support thread: %w", err)
+			}
+			// Add Subscriber as Participant
+			part := entity.NewThreadParticipant(thread.ID, "subscriber", sub.ID)
+			if err := tx.Threads().AddParticipant(ctx, part); err != nil {
+				return fmt.Errorf("failed to add subscriber participant: %w", err)
+			}
+			thread.Participants = append(thread.Participants, part)
+		} else if thread.Status == entity.ThreadStatusResolved {
+			// Reopen resolved thread
+			if err := thread.TransitionTo(entity.ThreadStatusUnassigned); err != nil {
+				return err
+			}
+			thread.IsOverdue = false
+			if err := tx.Threads().Update(ctx, thread); err != nil {
+				return fmt.Errorf("failed to reopen thread: %w", err)
+			}
+			s.broadcastEvent(envID, "thread_reopened", map[string]interface{}{
+				"threadID": thread.ID,
+			})
+		}
+
+		// 3. Add Message
+		realSenderID := sub.ID
+		if senderID != nil {
+			realSenderID = *senderID
+		}
+
+		msg := entity.NewMessage(tenantID, envID, thread.ID, "contact", &realSenderID, content)
+		createdMsg, err = tx.Messages().Create(ctx, msg)
+		if err != nil {
+			return fmt.Errorf("failed to create message: %w", err)
+		}
+
+		return nil
 	})
 
-	var thread *entity.Thread
-	if len(threads) > 0 {
-		thread = threads[0]
-	}
-
-	if thread == nil {
-		// Create new support thread
-		if channel == "" {
-			channel = "support"
-		}
-		thread = entity.NewThread(envID, "support", channel)
-		thread, err = s.threadRepo.Create(ctx, thread)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create support thread: %w", err)
-		}
-		// Add Subscriber as Participant
-		part := entity.NewThreadParticipant(thread.ID, "subscriber", sub.ID)
-		if err := s.threadRepo.AddParticipant(ctx, part); err != nil {
-			return nil, fmt.Errorf("failed to add subscriber participant: %w", err)
-		}
-		thread.Participants = append(thread.Participants, part)
-	} else if thread.Status == entity.ThreadStatusResolved {
-		// Reopen resolved thread
-		if err := thread.TransitionTo(entity.ThreadStatusUnassigned); err != nil {
-			return nil, err
-		}
-		thread.IsOverdue = false
-		if err := s.threadRepo.Update(ctx, thread); err != nil {
-			return nil, fmt.Errorf("failed to reopen thread: %w", err)
-		}
-		s.broadcastEvent(envID, "thread_reopened", map[string]interface{}{
-			"threadID": thread.ID,
-		})
-	}
-
-	// 3. Add Message
-	realSenderID := sub.ID
-	if senderID != nil {
-		realSenderID = *senderID
-	}
-
-	msg := entity.NewMessage(tenantID, envID, thread.ID, "contact", &realSenderID, content)
-	createdMsg, err := s.msgRepo.Create(ctx, msg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create message: %w", err)
+		return nil, err
 	}
+
 	s.broadcastEvent(envID, "message_received", createdMsg)
 	return createdMsg, nil
 }
@@ -200,45 +213,52 @@ func (s *conversationServiceImpl) AddInternalNote(ctx context.Context, tenantID,
 }
 
 func (s *conversationServiceImpl) AssignThread(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID, memberID uuid.UUID) error {
-	thread, err := s.threadRepo.GetByIDAndEnv(ctx, threadID, envID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch thread %s: %w", threadID, err)
-	}
-
-	if err := thread.TransitionTo(entity.ThreadStatusAssigned); err != nil {
-		return fmt.Errorf("failed to transition thread to assigned: %w", err)
-	}
-	if err := s.threadRepo.Update(ctx, thread); err != nil {
-		return fmt.Errorf("failed to update thread %s: %w", threadID, err)
-	}
-
-	// Add Member as Participant if not already
-	isParticipant := false
-	for _, p := range thread.Participants {
-		if p.EntityID == memberID && p.EntityType == "user" {
-			isParticipant = true
-			break
+	return s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
+		thread, err := tx.Threads().GetByIDAndEnv(ctx, threadID, envID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch thread %s: %w", threadID, err)
 		}
-	}
-	if !isParticipant {
-		part := entity.NewThreadParticipant(threadID, "user", memberID)
-		if err := s.threadRepo.AddParticipant(ctx, part); err != nil {
-			return fmt.Errorf("failed to add member as participant: %w", err)
+
+		if err := thread.TransitionTo(entity.ThreadStatusAssigned); err != nil {
+			return fmt.Errorf("failed to transition thread to assigned: %w", err)
 		}
-	}
+		if err := tx.Threads().Update(ctx, thread); err != nil {
+			return fmt.Errorf("failed to update thread %s: %w", threadID, err)
+		}
 
-	// Create Assignment Log
-	log := entity.NewAssignmentLog(threadID, &memberID)
-	if err := s.logRepo.Create(ctx, log); err != nil {
-		return fmt.Errorf("failed to create assignment log: %w", err)
-	}
+		// Add Member as Participant if not already
+		parts, err := tx.Threads().GetParticipants(ctx, threadID)
+		if err != nil {
+			return fmt.Errorf("failed to get participants: %w", err)
+		}
 
-	s.broadcastEvent(envID, "thread_assigned", map[string]interface{}{
-		"threadID":   threadID,
-		"assignedTo": memberID,
+		isParticipant := false
+		for _, p := range parts {
+			if p.EntityID == memberID && p.EntityType == "user" {
+				isParticipant = true
+				break
+			}
+		}
+		if !isParticipant {
+			part := entity.NewThreadParticipant(threadID, "user", memberID)
+			if err := tx.Threads().AddParticipant(ctx, part); err != nil {
+				return fmt.Errorf("failed to add member as participant: %w", err)
+			}
+		}
+
+		// Create Assignment Log
+		log := entity.NewAssignmentLog(threadID, &memberID)
+		if err := tx.AssignmentLogs().Create(ctx, log); err != nil {
+			return fmt.Errorf("failed to create assignment log: %w", err)
+		}
+
+		s.broadcastEvent(envID, "thread_assigned", map[string]interface{}{
+			"threadID":   threadID,
+			"assignedTo": memberID,
+		})
+
+		return nil
 	})
-
-	return nil
 }
 
 func (s *conversationServiceImpl) UnassignThread(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID) error {
@@ -266,16 +286,43 @@ func (s *conversationServiceImpl) UnassignThread(ctx context.Context, tenantID, 
 }
 
 func (s *conversationServiceImpl) BulkAssignThreads(ctx context.Context, tenantID, envID uuid.UUID, threadIDs []uuid.UUID, memberID uuid.UUID) error {
-	for _, threadID := range threadIDs {
-		// Use existing single assign logic
-		if err := s.AssignThread(ctx, tenantID, envID, threadID, memberID); err != nil {
-			// Continue or fail? Bulk usually implies best effort or transaction.
-			// Let's log error and continue (standard for non-transactional bulk APIs) or return first error.
-			// For simplicity/safer data, return error.
-			return fmt.Errorf("failed to assign thread %s: %w", threadID, err)
+	return s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
+		for _, threadID := range threadIDs {
+			// Inlined AssignThread logic to use the same transaction 'tx'
+			thread, err := tx.Threads().GetByIDAndEnv(ctx, threadID, envID)
+			if err != nil {
+				return fmt.Errorf("failed to fetch thread %s: %w", threadID, err)
+			}
+
+			if thread.Status == entity.ThreadStatusAssigned {
+				// Idempotency: skip if already assigned (we don't have member check on entity directly)
+				// continue
+			}
+
+			if err := thread.TransitionTo(entity.ThreadStatusAssigned); err != nil {
+				return fmt.Errorf("failed to transition thread %s: %w", threadID, err)
+			}
+			if err := tx.Threads().Update(ctx, thread); err != nil {
+				return fmt.Errorf("failed to update thread %s: %w", threadID, err)
+			}
+
+			// Add Member as Participant
+			part := entity.NewThreadParticipant(threadID, "user", memberID)
+			_ = tx.Threads().AddParticipant(ctx, part) // Ignore error if already participant
+
+			// Create Assignment Log
+			log := entity.NewAssignmentLog(threadID, &memberID)
+			if err := tx.AssignmentLogs().Create(ctx, log); err != nil {
+				return fmt.Errorf("failed to create assignment log for %s: %w", threadID, err)
+			}
+
+			s.broadcastEvent(envID, "thread_assigned", map[string]interface{}{
+				"threadID":   threadID,
+				"assignedTo": memberID,
+			})
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (s *conversationServiceImpl) ResolveThread(ctx context.Context, tenantID, envID uuid.UUID, threadID uuid.UUID) error {
@@ -304,7 +351,7 @@ func (s *conversationServiceImpl) ResolveThread(ctx context.Context, tenantID, e
 		duration := int(now.Sub(log.AssignedAt).Seconds())
 		log.ResponseTimeSeconds = &duration
 		if err := s.logRepo.Update(ctx, log); err != nil {
-			global.Logger.Warn("messaging_service: failed to update resolution log", zap.String("threadID", threadID.String()), zap.Error(err))
+			global.Logger.Warn("messaging_service: failed to update resolution log", "threadID", threadID.String(), "error", err)
 		}
 	}
 
@@ -421,7 +468,6 @@ func (s *conversationServiceImpl) GetMessagesByCursor(ctx context.Context, envID
 
 func (s *conversationServiceImpl) GetOrCreateDirectThread(ctx context.Context, envID, memberID uuid.UUID, targetID uuid.UUID, targetType string) (*entity.Thread, error) {
 	var thread *entity.Thread
-	var err error
 
 	// 1. Generate ReferenceHash for Direct Chat (Sorted IDs)
 	ids := []string{memberID.String(), targetID.String()}
@@ -430,58 +476,77 @@ func (s *conversationServiceImpl) GetOrCreateDirectThread(ctx context.Context, e
 	}
 	refHash := fmt.Sprintf("direct:%s:%s", ids[0], ids[1])
 
-	// 2. Try to create new thread (Atomic with unique constraint)
-	thread = entity.NewThread(envID, entity.ThreadTypeDirect, "internal")
-	thread.ReferenceHash = &refHash
-	thread, err = s.threadRepo.Create(ctx, thread)
-	if err != nil {
-		// 3. If failed (Unique Violation), try to fetch existing
-		thread, err = s.threadRepo.GetDirectThreadBetweenEntities(ctx, "user", memberID, targetType, targetID)
+	err := s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
+		var err error
+		// 2. Try to create new thread (Atomic with unique constraint)
+		thread = entity.NewThread(envID, entity.ThreadTypeDirect, "internal")
+		thread.ReferenceHash = &refHash
+		thread, err = tx.Threads().Create(ctx, thread)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get existing direct thread: %w", err)
+			// 3. If failed (Unique Violation), try to fetch existing
+			thread, err = tx.Threads().GetDirectThreadBetweenEntities(ctx, "user", memberID, targetType, targetID)
+			if err != nil {
+				return fmt.Errorf("failed to get existing direct thread: %w", err)
+			}
+			return nil // Thread exists, we are good
 		}
-		return thread, nil
+
+		// 3. Add Participants
+		p1 := entity.NewThreadParticipant(thread.ID, "user", memberID)
+		p2 := entity.NewThreadParticipant(thread.ID, targetType, targetID)
+
+		if err := tx.Threads().AddParticipant(ctx, p1); err != nil {
+			return fmt.Errorf("failed to add participant 1: %w", err)
+		}
+		if err := tx.Threads().AddParticipant(ctx, p2); err != nil {
+			return fmt.Errorf("failed to add participant 2: %w", err)
+		}
+
+		thread.Participants = []*entity.ThreadParticipant{p1, p2}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	// 3. Add Participants
-	p1 := entity.NewThreadParticipant(thread.ID, "user", memberID)
-	p2 := entity.NewThreadParticipant(thread.ID, targetType, targetID)
-
-	if err := s.threadRepo.AddParticipant(ctx, p1); err != nil {
-		return nil, fmt.Errorf("failed to add participant 1: %w", err)
-	}
-	if err := s.threadRepo.AddParticipant(ctx, p2); err != nil {
-		return nil, fmt.Errorf("failed to add participant 2: %w", err)
-	}
-
-	thread.Participants = []*entity.ThreadParticipant{p1, p2}
 	return thread, nil
 }
 
 func (s *conversationServiceImpl) CreateGroupThread(ctx context.Context, envID uuid.UUID, name string, inputParticipants []*entity.ThreadParticipant) (*entity.Thread, error) {
-	thread := entity.NewThread(envID, entity.ThreadTypeGroup, "internal")
-	// Metadata can store name if needed
-	meta := map[string]interface{}{
-		"name": name,
-	}
-	metaBytes, _ := json.Marshal(meta)
-	thread.Metadata = metaBytes
+	var thread *entity.Thread
 
-	thread, err := s.threadRepo.Create(ctx, thread)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create group thread: %w", err)
-	}
-
-	savedParticipants := make([]*entity.ThreadParticipant, 0, len(inputParticipants))
-	for _, p := range inputParticipants {
-		// Create new participant object with correct ThreadID
-		part := entity.NewThreadParticipant(thread.ID, p.EntityType, p.EntityID)
-		if err := s.threadRepo.AddParticipant(ctx, part); err != nil {
-			return nil, err
+	err := s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
+		var err error
+		thread = entity.NewThread(envID, entity.ThreadTypeGroup, "internal")
+		// Metadata can store name if needed
+		meta := map[string]interface{}{
+			"name": name,
 		}
-		savedParticipants = append(savedParticipants, part)
+		metaBytes, _ := json.Marshal(meta)
+		thread.Metadata = metaBytes
+
+		thread, err = tx.Threads().Create(ctx, thread)
+		if err != nil {
+			return fmt.Errorf("failed to create group thread: %w", err)
+		}
+
+		savedParticipants := make([]*entity.ThreadParticipant, 0, len(inputParticipants))
+		for _, p := range inputParticipants {
+			// Create new participant object with correct ThreadID
+			part := entity.NewThreadParticipant(thread.ID, p.EntityType, p.EntityID)
+			if err := tx.Threads().AddParticipant(ctx, part); err != nil {
+				return err
+			}
+			savedParticipants = append(savedParticipants, part)
+		}
+		thread.Participants = savedParticipants
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	thread.Participants = savedParticipants
 
 	return thread, nil
 }
@@ -688,7 +753,7 @@ func (s *conversationServiceImpl) calculateTimeline(ctx context.Context, memberI
 
 	entityPoints, err := s.logRepo.GetActivityTimeline(ctx, envID, memberID, from, to, interval)
 	if err != nil {
-		global.Logger.Error(fmt.Sprintf("PersonalDashboard: failed to fetch activity timeline: %v", err))
+		global.Logger.Error("PersonalDashboard: failed to fetch activity timeline", "error", err)
 		return []dto.ActivityPoint{}
 	}
 
@@ -829,7 +894,7 @@ func (s *conversationServiceImpl) broadcastEvent(envID uuid.UUID, eventType stri
 
 	data, err := json.Marshal(event)
 	if err != nil {
-		global.Logger.Error("messaging_service: failed to marshal broadcast event", zap.String("type", eventType), zap.Error(err))
+		global.Logger.Error("messaging_service: failed to marshal broadcast event", "type", eventType, "error", err)
 		return
 	}
 

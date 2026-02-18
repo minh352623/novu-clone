@@ -11,7 +11,6 @@ import (
 	// Postgresql driver
 	_ "github.com/lib/pq"
 
-	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -24,7 +23,7 @@ func InitPostgresql() {
 
 	db, err := sql.Open("postgres", s)
 	if err != nil {
-		global.Logger.Error("Failed to connect to database", zap.Error(err))
+		global.Logger.Error("Failed to connect to database", "error", err)
 		panic(err)
 	}
 
@@ -34,13 +33,13 @@ func InitPostgresql() {
 	// Initialize GORM
 	gormDB, err := gorm.Open(postgres.Open(s), &gorm.Config{})
 	if err != nil {
-		global.Logger.Error("Failed to initialize GORM", zap.Error(err))
+		global.Logger.Error("Failed to initialize GORM", "error", err)
 		panic(err)
 	}
 
 	// Register RLS Plugin
 	if err := gormDB.Use(plugin.NewRLSPlugin()); err != nil {
-		global.Logger.Error("Failed to register RLS plugin", zap.Error(err))
+		global.Logger.Error("Failed to register RLS plugin", "error", err)
 		panic(err)
 	}
 
