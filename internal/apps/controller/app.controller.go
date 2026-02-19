@@ -59,7 +59,7 @@ func (c *AppController) CreateApp(ctx *gin.Context) (interface{}, error) {
 
 	app, err := c.appService.CreateApp(ctx.Request.Context(), tenantID, req.Name, req.Description, req.SLAThresholdSeconds)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToAppResponse(app), nil
@@ -83,7 +83,7 @@ func (c *AppController) ListApps(ctx *gin.Context) (interface{}, error) {
 
 	apps, err := c.appService.ListApps(ctx.Request.Context(), tenantID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToAppResponseList(apps), nil
@@ -107,7 +107,7 @@ func (c *AppController) GetApp(ctx *gin.Context) (interface{}, error) {
 
 	app, err := c.appService.GetApp(ctx.Request.Context(), appID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusNotFound, "App not found", err)
+		return nil, response.NewNotFoundError("App not found")
 	}
 
 	return dto.ToAppResponse(app), nil
@@ -138,7 +138,7 @@ func (c *AppController) UpdateApp(ctx *gin.Context) (interface{}, error) {
 
 	app, err := c.appService.GetApp(ctx.Request.Context(), appID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusNotFound, "App not found", err)
+		return nil, response.NewNotFoundError("App not found")
 	}
 
 	if req.Name != nil {
@@ -152,7 +152,7 @@ func (c *AppController) UpdateApp(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.appService.UpdateApp(ctx.Request.Context(), app); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToAppResponse(app), nil
@@ -175,7 +175,7 @@ func (c *AppController) DeleteApp(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.appService.DeleteApp(ctx.Request.Context(), appID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return gin.H{"message": "App deleted"}, nil
@@ -206,7 +206,7 @@ func (c *AppController) CreateEnvironment(ctx *gin.Context) (interface{}, error)
 
 	env, err := c.envService.CreateEnvironment(ctx.Request.Context(), appID, req.Code, req.SLAThresholdSeconds)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToEnvironmentResponse(env), nil

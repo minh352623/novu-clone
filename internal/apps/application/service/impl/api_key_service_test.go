@@ -7,6 +7,7 @@ import (
 
 	"CONVERDA/internal/apps/application/service/impl"
 	"CONVERDA/internal/apps/domain/model/entity"
+	"CONVERDA/internal/apps/domain/repository"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -106,6 +107,40 @@ func (m *MockEnvironmentRepository) Delete(ctx context.Context, id uuid.UUID) er
 	return args.Error(0)
 }
 
+// MockAppsUnitOfWork is a mock implementation
+type MockAppsUnitOfWork struct {
+	mock.Mock
+}
+
+func (m *MockAppsUnitOfWork) Execute(ctx context.Context, fn func(repository.AppsTxRepository) error) error {
+	args := m.Called(ctx, fn)
+	return args.Error(0)
+}
+
+// MockAppsTxRepository is a mock implementation
+type MockAppsTxRepository struct {
+	mock.Mock
+}
+
+func (m *MockAppsTxRepository) Apps() repository.AppRepository {
+	return m.Called().Get(0).(repository.AppRepository)
+}
+func (m *MockAppsTxRepository) Environments() repository.EnvironmentRepository {
+	return m.Called().Get(0).(repository.EnvironmentRepository)
+}
+func (m *MockAppsTxRepository) APIKeys() repository.APIKeyRepository {
+	return m.Called().Get(0).(repository.APIKeyRepository)
+}
+func (m *MockAppsTxRepository) Webhooks() repository.WebhookRepository {
+	return m.Called().Get(0).(repository.WebhookRepository)
+}
+func (m *MockAppsTxRepository) Providers() repository.ProviderRepository {
+	return m.Called().Get(0).(repository.ProviderRepository)
+}
+func (m *MockAppsTxRepository) Metrics() repository.UsageMetricRepository {
+	return m.Called().Get(0).(repository.UsageMetricRepository)
+}
+
 func TestAPIKeyService_GenerateKey(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
@@ -113,8 +148,9 @@ func TestAPIKeyService_GenerateKey(t *testing.T) {
 
 	mockAPIKeyRepo := new(MockAPIKeyRepository)
 	mockEnvRepo := new(MockEnvironmentRepository)
+	mockUoW := new(MockAppsUnitOfWork)
 
-	service := impl.NewAPIKeyService(mockAPIKeyRepo, mockEnvRepo)
+	service := impl.NewAPIKeyService(mockAPIKeyRepo, mockEnvRepo, mockUoW)
 
 	t.Run("successful generation for prod environment", func(t *testing.T) {
 		env := &entity.Environment{
@@ -158,7 +194,8 @@ func TestAPIKeyService_ValidateKey(t *testing.T) {
 
 	mockAPIKeyRepo := new(MockAPIKeyRepository)
 	mockEnvRepo := new(MockEnvironmentRepository)
-	service := impl.NewAPIKeyService(mockAPIKeyRepo, mockEnvRepo)
+	mockUoW := new(MockAppsUnitOfWork)
+	service := impl.NewAPIKeyService(mockAPIKeyRepo, mockEnvRepo, mockUoW)
 
 	t.Run("valid key", func(t *testing.T) {
 		apiKey := &entity.APIKey{

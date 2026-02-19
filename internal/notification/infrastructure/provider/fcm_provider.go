@@ -35,12 +35,12 @@ func NewFcmProvider(configBytes []byte) (PushProvider, error) {
 	opt := option.WithCredentialsJSON([]byte(cfg.ServiceAccountJSON))
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing firebase app: %v", err)
+		return nil, fmt.Errorf("error initializing firebase app: %w", err)
 	}
 
 	client, err := app.Messaging(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("error getting messaging client: %v", err)
+		return nil, fmt.Errorf("error getting messaging client: %w", err)
 	}
 
 	return &fcmProvider{client: client}, nil

@@ -1,0 +1,9 @@
+# Không commit file này — chỉ là gitignore của kit, không phải project
+# Khi copy vào project, merge với .gitignore của project
+
+# AI tool cache (không cần commit)
+.claude/cache/
+.cursor/cache/
+
+# Generated files từ AI tools (không cần commit)  
+implementation_plan*.md

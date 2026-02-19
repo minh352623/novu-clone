@@ -12,15 +12,16 @@ import (
 
 // Service errors
 var (
-	ErrUserNotFound       = errors.New("user not found")
-	ErrUserAlreadyExists  = errors.New("user with this email already exists")
-	ErrTenantNotFound     = errors.New("tenant not found")
-	ErrTenantSlugExists   = errors.New("tenant with this slug already exists")
-	ErrRoleNotFound       = errors.New("role not found")
-	ErrMemberNotFound     = errors.New("tenant member not found")
-	ErrPlanNotFound       = errors.New("pricing plan not found")
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrUnauthorized       = errors.New("unauthorized access")
+	ErrUserNotFound             = errors.New("user not found")
+	ErrUserAlreadyExists        = errors.New("user with this email already exists")
+	ErrTenantNotFound           = errors.New("tenant not found")
+	ErrTenantSlugExists         = errors.New("tenant with this slug already exists")
+	ErrRoleNotFound             = errors.New("role not found")
+	ErrMemberNotFound           = errors.New("tenant member not found")
+	ErrPlanNotFound             = errors.New("pricing plan not found")
+	ErrInvalidCredentials       = errors.New("invalid email or password")
+	ErrUnauthorized             = errors.New("unauthorized access")
+	ErrInvitationAlreadyPending = errors.New("invitation already pending for this email")
 )
 
 // AuthService handles authentication operations

@@ -14,33 +14,45 @@ import (
 
 type environmentServiceImpl struct {
 	envRepo repository.EnvironmentRepository
+	uow     repository.AppsUnitOfWork
 }
 
-func NewEnvironmentService(envRepo repository.EnvironmentRepository) service.EnvironmentService {
+func NewEnvironmentService(envRepo repository.EnvironmentRepository, uow repository.AppsUnitOfWork) service.EnvironmentService {
 	return &environmentServiceImpl{
 		envRepo: envRepo,
+		uow:     uow,
 	}
 }
 
 func (s *environmentServiceImpl) CreateEnvironment(ctx context.Context, appID uuid.UUID, code string, slaThreshold *int) (*entity.Environment, error) {
-	// Check if exists
-	existing, _ := s.envRepo.GetByAppAndCode(ctx, appID, code)
-	if existing != nil {
-		return nil, entity.ErrDuplicateEnvironment
-	}
+	var created *entity.Environment
 
-	env, err := entity.NewEnvironment(appID, code)
+	err := s.uow.Execute(ctx, func(tx repository.AppsTxRepository) error {
+		// Check if exists
+		existing, _ := tx.Environments().GetByAppAndCode(ctx, appID, code)
+		if existing != nil {
+			return entity.ErrDuplicateEnvironment
+		}
+
+		env, err := entity.NewEnvironment(appID, code)
+		if err != nil {
+			return err
+		}
+		if slaThreshold != nil {
+			env.SLAThresholdSeconds = *slaThreshold
+		}
+
+		created, err = tx.Environments().Create(ctx, env)
+		if err != nil {
+			return fmt.Errorf("failed to create environment: %w", err)
+		}
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	if slaThreshold != nil {
-		env.SLAThresholdSeconds = *slaThreshold
-	}
 
-	created, err := s.envRepo.Create(ctx, env)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create environment: %w", err)
-	}
 	return created, nil
 }
 

@@ -32,7 +32,7 @@ func InitWorkflowModule(db *gorm.DB, router *gin.RouterGroup, authMiddleware gin
 	digestHandler := impl.NewDigestHandler(execRepo)
 
 	// Services
-	workflowService := impl.NewWorkflowService(workflowRepo)
+	workflowService := impl.NewWorkflowService(workflowRepo, uow)
 	triggerService := impl.NewTriggerService(workflowRepo, execRepo, uow, channelHandler, delayHandler)
 
 	// Controller

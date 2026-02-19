@@ -16,13 +16,15 @@ import (
 
 type jobScheduler struct {
 	repo         repository.NotificationJobRepository
+	uow          repository.NotificationUnitOfWork
 	notifService service.NotificationService
 	tmplManager  *service.TemplateManager
 }
 
-func NewJobScheduler(repo repository.NotificationJobRepository, notifService service.NotificationService, tmplManager *service.TemplateManager) service.JobScheduler {
+func NewJobScheduler(repo repository.NotificationJobRepository, uow repository.NotificationUnitOfWork, notifService service.NotificationService, tmplManager *service.TemplateManager) service.JobScheduler {
 	return &jobScheduler{
 		repo:         repo,
+		uow:          uow,
 		notifService: notifService,
 		tmplManager:  tmplManager,
 	}
@@ -53,31 +55,35 @@ func (s *jobScheduler) ScheduleJob(ctx context.Context, envID uuid.UUID, tenantI
 		UpdatedAt:      time.Now(),
 	}
 
-	if err := s.repo.Create(ctx, job); err != nil {
-		return nil, fmt.Errorf("failed to create job: %w", err)
+	if err := s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		return tx.Jobs().Create(ctx, job)
+	}); err != nil {
+		return nil, err
 	}
 	return job, nil
 }
 
 func (s *jobScheduler) CancelJob(ctx context.Context, envID uuid.UUID, id uuid.UUID) error {
-	job, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to fetch job %s: %w", id, err)
-	}
-	if job == nil {
-		return nil
-	}
-	if job.EnvironmentID != envID {
-		return domain.ErrJobNotInEnv
-	}
+	return s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		job, err := tx.Jobs().GetByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch job %s: %w", id, err)
+		}
+		if job == nil {
+			return nil
+		}
+		if job.EnvironmentID != envID {
+			return domain.ErrJobNotInEnv
+		}
 
-	if job.Status == entity.JobStatusCompleted || job.Status == entity.JobStatusFailed || job.Status == entity.JobStatusCancelled {
-		return domain.ErrJobNotCancellable
-	}
+		if job.Status == entity.JobStatusCompleted || job.Status == entity.JobStatusFailed || job.Status == entity.JobStatusCancelled {
+			return domain.ErrJobNotCancellable
+		}
 
-	job.Status = entity.JobStatusCancelled
-	job.UpdatedAt = time.Now()
-	return s.repo.Update(ctx, job)
+		job.Status = entity.JobStatusCancelled
+		job.UpdatedAt = time.Now()
+		return tx.Jobs().Update(ctx, job)
+	})
 }
 
 func (s *jobScheduler) GetJob(ctx context.Context, envID uuid.UUID, id uuid.UUID) (*entity.NotificationJob, error) {
@@ -134,20 +140,26 @@ func (s *jobScheduler) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 		return domain.ErrTemplateCodeMissing
 	}
 
-	now := time.Now()
-	job.StartedAt = &now
-	job.Status = entity.JobStatusProcessing
-	if err := s.repo.Update(ctx, job); err != nil {
-		return fmt.Errorf("failed to update job status: %w", err)
+	// Step 1: Mark job as Processing
+	if err := s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		now := time.Now()
+		job.StartedAt = &now
+		job.Status = entity.JobStatusProcessing
+		return tx.Jobs().Update(ctx, job)
+	}); err != nil {
+		return fmt.Errorf("failed to update job status to processing: %w", err)
 	}
 
 	recipientsList, ok := job.RecipientsData["recipients"].([]interface{})
 	if !ok {
 		// Log error or fail
-		job.Status = entity.JobStatusFailed
-		msg := "invalid recipients data"
-		job.ErrorMessage = &msg
-		return s.repo.Update(ctx, job)
+		s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+			job.Status = entity.JobStatusFailed
+			msg := "invalid recipients data"
+			job.ErrorMessage = &msg
+			return tx.Jobs().Update(ctx, job)
+		})
+		return fmt.Errorf("invalid recipients data")
 	}
 
 	success := 0
@@ -186,19 +198,26 @@ func (s *jobScheduler) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 		}
 	}
 
-	completedAt := time.Now()
-	job.CompletedAt = &completedAt
-	job.TotalCount = len(recipientsList) // Update total just in case
-	job.SuccessCount = success
-	job.FailedCount = failed
-	job.Status = entity.JobStatusCompleted
-	if failed > 0 && success == 0 {
-		job.Status = entity.JobStatusFailed
-		msg := "all recipients failed"
-		job.ErrorMessage = &msg
-	}
+	// Step 2: Mark job as Completed or Failed
+	return s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		completedAt := time.Now()
+		job.CompletedAt = &completedAt
+		job.TotalCount = len(recipientsList)
+		job.SuccessCount = success
+		job.FailedCount = failed
+		job.Status = entity.JobStatusCompleted
 
-	return s.repo.Update(ctx, job)
+		if failed > 0 && success == 0 {
+			job.Status = entity.JobStatusFailed
+			msg := "all recipients failed"
+			job.ErrorMessage = &msg
+		} else if failed > 0 {
+			msg := fmt.Sprintf("completed with %d failures", failed)
+			job.ErrorMessage = &msg
+		}
+
+		return tx.Jobs().Update(ctx, job)
+	})
 }
 
 func safeUUIDString(u *uuid.UUID) string {

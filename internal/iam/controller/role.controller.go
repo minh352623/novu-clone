@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"net/http"
-
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/controller/dto"
 	"CONVERDA/internal/iam/domain/repository"
@@ -40,12 +38,12 @@ func NewRoleController(roleService service.RoleService, memberService service.Me
 func (c *RoleController) CreateRole(ctx *gin.Context) (interface{}, error) {
 	var req dto.CreateRoleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	role, err := c.roleService.CreateRole(ctx.Request.Context(), req.Name, req.Slug, req.Permissions)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToRoleResponse(role), nil
@@ -65,15 +63,15 @@ func (c *RoleController) GetRole(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid role ID", err)
+		return nil, response.NewBadRequestError("Invalid role ID")
 	}
 
 	role, err := c.roleService.GetRole(ctx.Request.Context(), id)
 	if err != nil {
 		if err == service.ErrRoleNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+			return nil, response.NewNotFoundError("Role not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToRoleResponse(role), nil
@@ -102,7 +100,7 @@ func (c *RoleController) ListRoles(ctx *gin.Context) (interface{}, error) {
 
 	roles, total, err := c.roleService.ListRoles(ctx.Request.Context(), filters)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.NewPaginatedResponse(
@@ -130,21 +128,21 @@ func (c *RoleController) UpdateRole(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid role ID", err)
+		return nil, response.NewBadRequestError("Invalid role ID")
 	}
 
 	var req dto.UpdateRoleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Get existing role (verification)
 	role, err := c.roleService.GetRole(ctx.Request.Context(), id)
 	if err != nil {
 		if err == service.ErrRoleNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+			return nil, response.NewNotFoundError("Role not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	// Update fields
@@ -156,7 +154,7 @@ func (c *RoleController) UpdateRole(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.roleService.UpdateRole(ctx.Request.Context(), role); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToRoleResponse(role), nil
@@ -176,11 +174,11 @@ func (c *RoleController) DeleteRole(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid role ID", err)
+		return nil, response.NewBadRequestError("Invalid role ID")
 	}
 
 	if err := c.roleService.DeleteRole(ctx.Request.Context(), id); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return nil, nil // 204 No Content handled by wrapper if returning nil data? Wrapper uses 200 usually.
@@ -205,16 +203,16 @@ func (c *RoleController) UpdatePermissions(ctx *gin.Context) (interface{}, error
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid role ID", err)
+		return nil, response.NewBadRequestError("Invalid role ID")
 	}
 
 	var permissions map[string]interface{}
 	if err := ctx.ShouldBindJSON(&permissions); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	if err := c.roleService.UpdatePermissions(ctx.Request.Context(), id, permissions); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return gin.H{"message": "Permissions updated successfully"}, nil
@@ -236,12 +234,12 @@ func (c *RoleController) AssignRole(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	roleID, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid role ID", err)
+		return nil, response.NewBadRequestError("Invalid role ID")
 	}
 
 	var req dto.AssignRoleRequest // We need this DTO: UserID inside
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// This assumes request has MemberID (TenantMember.ID), not UserID specifically ?
@@ -255,7 +253,7 @@ func (c *RoleController) AssignRole(ctx *gin.Context) (interface{}, error) {
 	// Let's Assume req.MemberID is passed.
 
 	if err := c.memberService.AssignRole(ctx.Request.Context(), req.UserID, roleID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return gin.H{"message": "Role assigned successfully"}, nil
@@ -282,11 +280,11 @@ func (c *RoleController) RevokeRole(ctx *gin.Context) (interface{}, error) {
 
 	var req dto.RevokeRoleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	if err := c.memberService.RevokeRole(ctx.Request.Context(), req.UserID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return gin.H{"message": "Role revoked successfully"}, nil

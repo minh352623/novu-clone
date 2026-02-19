@@ -1,0 +1,86 @@
+---
+description: Rules for HTTP handler files in the Interface layer
+globs: ["internal/*/controller/http/*.go", "internal/*/controller/http/**/*.go"]
+alwaysApply: false
+---
+
+# Handler (Interface Layer) Rules
+
+You are writing an HTTP handler in a Go DDD project using GIN framework.
+This file lives in the **Interface Layer** — the outermost layer.
+
+## Your responsibilities
+- Parse HTTP request → bind to DTO struct
+- Validate input (via ShouldBindJSON/ShouldBindQuery with binding tags)
+- Call ONE application service method
+- Map result to HTTP response using `response.Success()` / `response.HandleError()`
+- Set correct HTTP status codes
+
+## What you MUST NOT do
+- Contain any business logic
+- Call repository directly (repository is infrastructure, not accessible from here)
+- Know about domain entities — work with DTOs only
+- Import from `domain/` package directly
+- Write SQL or know about database
+- Throw/create domain errors — just forward them to `response.HandleError()`
+
+## Required pattern
+
+```go
+package http
+
+import (
+    "net/http"
+
+    "github.com/gin-gonic/gin"
+    "[module]/internal/[domain]/application/service"
+    "[module]/internal/[domain]/controller/dto"
+    "[module]/internal/common/response"
+)
+
+type [Name]Handler struct {
+    [name]Svc service.I[Name]Service
+}
+
+func New[Name]Handler(svc service.I[Name]Service) *[Name]Handler {
+    return &[Name]Handler{[name]Svc: svc}
+}
+
+func (h *[Name]Handler) Create(c *gin.Context) {
+    var req dto.Create[Name]Req
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, response.Error(err))
+        return
+    }
+
+    result, err := h.[name]Svc.Create(c.Request.Context(), &req)
+    if err != nil {
+        response.HandleError(c, err) // centralized error → HTTP status mapping
+        return
+    }
+
+    c.JSON(http.StatusCreated, response.Success(result))
+}
+```
+
+## Never use these patterns
+```go
+// ❌ Hardcoded status text
+c.JSON(500, gin.H{"error": err.Error()})  // leaks internals
+
+// ❌ Business logic in handler
+if order.Amount > 1000 { applyDiscount() }
+
+// ❌ Direct DB access
+db.Query("SELECT ...")
+
+// ❌ Importing domain repository
+import "project/internal/order/domain/repository"
+```
+
+## Getting current user
+```go
+// Use the helper that reads from JWT middleware context
+userID := middleware.GetCurrentUserID(c)  // returns string
+user := middleware.GetCurrentUser(c)      // returns *dto.CurrentUser
+```

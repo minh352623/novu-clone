@@ -122,11 +122,16 @@ func (m *mockExecRepo) GetDigestingSteps(ctx context.Context, limit int) ([]*ent
 
 type mockWorkflowTxRepository struct {
 	mock.Mock
-	MockExecRepo *mockExecRepo
+	MockExecRepo     *mockExecRepo
+	MockWorkflowRepo *mockWorkflowRepo
 }
 
 func (m *mockWorkflowTxRepository) Executions() domainRepo.ExecutionRepository {
 	return m.MockExecRepo
+}
+
+func (m *mockWorkflowTxRepository) Workflows() domainRepo.WorkflowRepository {
+	return m.MockWorkflowRepo
 }
 
 type mockWorkflowUow struct {
@@ -156,7 +161,12 @@ func TestTriggerService_Trigger_ChannelStep(t *testing.T) {
 
 	wfRepo := new(mockWorkflowRepo)
 	execRepo := new(mockExecRepo)
-	uow := &mockWorkflowUow{TxRepo: &mockWorkflowTxRepository{MockExecRepo: execRepo}}
+	uow := &mockWorkflowUow{
+		TxRepo: &mockWorkflowTxRepository{
+			MockExecRepo:     execRepo,
+			MockWorkflowRepo: wfRepo,
+		},
+	}
 	channelHandler := new(mockStepHandler)
 	delayHandler := new(mockStepHandler)
 

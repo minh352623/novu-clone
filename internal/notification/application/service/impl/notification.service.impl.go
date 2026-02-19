@@ -11,24 +11,26 @@ import (
 	notifDomain "CONVERDA/internal/notification/domain"
 	"CONVERDA/internal/notification/domain/entity"
 	"CONVERDA/internal/notification/domain/repository"
-	"CONVERDA/internal/notification/infrastructure/provider"
 
 	"github.com/google/uuid"
 )
 
 type notificationServiceImpl struct {
 	notifRepo   repository.NotificationRepository
+	uow         repository.NotificationUnitOfWork
 	tmplManager *service.TemplateManager
-	dispatcher  *provider.Dispatcher
+	dispatcher  repository.INotificationDispatcher
 }
 
 func NewNotificationService(
 	notifRepo repository.NotificationRepository,
+	uow repository.NotificationUnitOfWork,
 	tmplManager *service.TemplateManager,
-	dispatcher *provider.Dispatcher,
+	dispatcher repository.INotificationDispatcher,
 ) service.NotificationService {
 	return &notificationServiceImpl{
 		notifRepo:   notifRepo,
+		uow:         uow,
 		tmplManager: tmplManager,
 		dispatcher:  dispatcher,
 	}
@@ -67,7 +69,9 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	}
 	notif := entity.NewNotification(tenantID, envID, req.TemplateCode, req.Recipient, req.Channel, dataBytes)
 
-	if err := s.notifRepo.Create(ctx, notif); err != nil {
+	if err := s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		return tx.Notifications().Create(ctx, notif)
+	}); err != nil {
 		return nil, fmt.Errorf("failed to create notification record: %w", err)
 	}
 
@@ -81,18 +85,20 @@ func (s *notificationServiceImpl) Send(ctx context.Context, req service.SendRequ
 	dispatchErr := s.dispatcher.Dispatch(ctx, envID, req.Channel, req.Recipient, subject, body, pushData)
 
 	// 5. Update Status
-	now := time.Now()
-	if dispatchErr != nil {
-		notif.Status = notifDomain.StatusFailed
-		errMsg := dispatchErr.Error()
-		notif.ErrorMessage = &errMsg
-	} else {
-		notif.Status = notifDomain.StatusSent
-		notif.SentAt = &now
-	}
-	notif.UpdatedAt = now
+	if err := s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		now := time.Now()
+		if dispatchErr != nil {
+			notif.Status = notifDomain.StatusFailed
+			errMsg := dispatchErr.Error()
+			notif.ErrorMessage = &errMsg
+		} else {
+			notif.Status = notifDomain.StatusSent
+			notif.SentAt = &now
+		}
+		notif.UpdatedAt = now
 
-	if err := s.notifRepo.Update(ctx, notif); err != nil {
+		return tx.Notifications().Update(ctx, notif)
+	}); err != nil {
 		global.Logger.Error("notification_service: failed to update notification status", "notificationID", notif.ID.String(), "error", err)
 	}
 

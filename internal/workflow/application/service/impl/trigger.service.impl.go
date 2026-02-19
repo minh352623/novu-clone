@@ -8,6 +8,7 @@ import (
 
 	"CONVERDA/global"
 	"CONVERDA/internal/workflow/application/service"
+	"CONVERDA/internal/workflow/domain"
 	"CONVERDA/internal/workflow/domain/model/entity"
 	"CONVERDA/internal/workflow/domain/repository"
 
@@ -44,7 +45,7 @@ func (s *triggerServiceImpl) Trigger(ctx context.Context, envID uuid.UUID, trigg
 	// 1. Find active workflow
 	workflow, err := s.workflowRepo.GetByTrigger(ctx, envID, triggerIdentifier)
 	if err != nil {
-		return fmt.Errorf("workflow not found for trigger %q: %w", triggerIdentifier, err)
+		return domain.ErrWorkflowNotFound
 	}
 
 	if len(workflow.Steps) == 0 {
@@ -94,8 +95,7 @@ func (s *triggerServiceImpl) Trigger(ctx context.Context, envID uuid.UUID, trigg
 		}
 
 		// 4. Execute steps starting from the first
-		s.executeStepsFrom(ctx, txExecRepo, exec, steps, stepExecs, 0)
-		return nil
+		return s.executeStepsFrom(ctx, txExecRepo, exec, steps, stepExecs, 0)
 	})
 }
 
@@ -103,7 +103,7 @@ func (s *triggerServiceImpl) Trigger(ctx context.Context, envID uuid.UUID, trigg
 // Stops when a Delay step is encountered (it will be picked up by the worker) or on error.
 func (s *triggerServiceImpl) executeStepsFrom(ctx context.Context, execRepo repository.ExecutionRepository,
 	exec *entity.WorkflowExecution, steps []entity.WorkflowStep,
-	stepExecs []*entity.StepExecution, fromIndex int) {
+	stepExecs []*entity.StepExecution, fromIndex int) error {
 
 	for i := fromIndex; i < len(steps); i++ {
 		step := &steps[i]
@@ -127,20 +127,18 @@ func (s *triggerServiceImpl) executeStepsFrom(ctx context.Context, execRepo repo
 			handler = s.delayHandler
 		default:
 			global.Logger.Error("workflow_trigger: unknown step type", "stepType", step.StepType, "executionID", exec.ID.String())
-			s.markStepFailed(ctx, execRepo, stepExec, exec, "unknown step type: "+step.StepType)
-			return
+			return s.markStepFailed(ctx, execRepo, stepExec, exec, "unknown step type: "+step.StepType)
 		}
 
 		if err := handler.Execute(ctx, step, exec, stepExec); err != nil {
 			global.Logger.Error("workflow_trigger: step execution failed", "stepID", step.ID.String(), "executionID", exec.ID.String(), "error", err)
-			s.markStepFailed(ctx, execRepo, stepExec, exec, err.Error())
-			return
+			return s.markStepFailed(ctx, execRepo, stepExec, exec, err.Error())
 		}
 
 		// Delay steps set their own status to "scheduled" — stop processing
 		if step.StepType == entity.StepTypeDelay {
 			global.Logger.Info("workflow_trigger: delay step scheduled, pausing execution", "executionID", exec.ID.String())
-			return
+			return nil
 		}
 
 		// Channel step success — mark completed and continue
@@ -158,13 +156,15 @@ func (s *triggerServiceImpl) executeStepsFrom(ctx context.Context, execRepo repo
 	exec.CompletedAt = &completedAt
 	if err := execRepo.UpdateExecution(ctx, exec); err != nil {
 		global.Logger.Warn("workflow_trigger: failed to update execution status", "executionID", exec.ID.String(), "error", err)
+		return fmt.Errorf("failed to complete execution: %w", err)
 	}
 
 	global.Logger.Info("workflow_trigger: execution completed", "executionID", exec.ID.String())
+	return nil
 }
 
 func (s *triggerServiceImpl) markStepFailed(ctx context.Context, execRepo repository.ExecutionRepository,
-	stepExec *entity.StepExecution, exec *entity.WorkflowExecution, reason string) {
+	stepExec *entity.StepExecution, exec *entity.WorkflowExecution, reason string) error {
 
 	now := time.Now()
 	stepExec.Status = entity.StepStatusFailed
@@ -179,4 +179,6 @@ func (s *triggerServiceImpl) markStepFailed(ctx context.Context, execRepo reposi
 	if err := execRepo.UpdateExecution(ctx, exec); err != nil {
 		global.Logger.Warn("workflow_trigger: failed to mark execution as failed", "executionID", exec.ID.String(), "error", err)
 	}
+
+	return fmt.Errorf("step failed: %s", reason)
 }

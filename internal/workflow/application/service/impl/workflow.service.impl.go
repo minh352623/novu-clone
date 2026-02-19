@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"CONVERDA/internal/workflow/controller/dto"
+	"CONVERDA/internal/workflow/domain"
 	"CONVERDA/internal/workflow/domain/model/entity"
 	"CONVERDA/internal/workflow/domain/repository"
 
@@ -14,10 +15,14 @@ import (
 
 type workflowServiceImpl struct {
 	workflowRepo repository.WorkflowRepository
+	uow          repository.WorkflowUnitOfWork
 }
 
-func NewWorkflowService(workflowRepo repository.WorkflowRepository) *workflowServiceImpl {
-	return &workflowServiceImpl{workflowRepo: workflowRepo}
+func NewWorkflowService(workflowRepo repository.WorkflowRepository, uow repository.WorkflowUnitOfWork) *workflowServiceImpl {
+	return &workflowServiceImpl{
+		workflowRepo: workflowRepo,
+		uow:          uow,
+	}
 }
 
 func (s *workflowServiceImpl) CreateWorkflow(ctx context.Context, envID uuid.UUID, req dto.CreateWorkflowRequest) (*dto.WorkflowResponse, error) {
@@ -31,7 +36,9 @@ func (s *workflowServiceImpl) CreateWorkflow(ctx context.Context, envID uuid.UUI
 		UpdatedAt:         time.Now(),
 	}
 
-	if err := s.workflowRepo.Create(ctx, wf); err != nil {
+	if err := s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		return tx.Workflows().Create(ctx, wf)
+	}); err != nil {
 		return nil, fmt.Errorf("failed to create workflow: %w", err)
 	}
 
@@ -41,7 +48,7 @@ func (s *workflowServiceImpl) CreateWorkflow(ctx context.Context, envID uuid.UUI
 func (s *workflowServiceImpl) GetWorkflow(ctx context.Context, id uuid.UUID) (*dto.WorkflowResponse, error) {
 	wf, err := s.workflowRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get workflow %s: %w", id, err)
+		return nil, domain.ErrWorkflowNotFound
 	}
 	return dto.ToWorkflowResponse(wf), nil
 }
@@ -55,69 +62,85 @@ func (s *workflowServiceImpl) ListWorkflows(ctx context.Context, envID uuid.UUID
 }
 
 func (s *workflowServiceImpl) UpdateWorkflow(ctx context.Context, id uuid.UUID, req dto.UpdateWorkflowRequest) (*dto.WorkflowResponse, error) {
-	wf, err := s.workflowRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get workflow %s for update: %w", id, err)
-	}
+	var wf *entity.Workflow
+	if err := s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		var err error
+		wf, err = tx.Workflows().GetByID(ctx, id)
+		if err != nil {
+			return domain.ErrWorkflowNotFound
+		}
 
-	if req.Name != nil {
-		wf.Name = *req.Name
-	}
-	if req.TriggerIdentifier != nil {
-		wf.TriggerIdentifier = *req.TriggerIdentifier
-	}
-	wf.UpdatedAt = time.Now()
+		if req.Name != nil {
+			wf.Name = *req.Name
+		}
+		if req.TriggerIdentifier != nil {
+			wf.TriggerIdentifier = *req.TriggerIdentifier
+		}
+		wf.UpdatedAt = time.Now()
 
-	if err := s.workflowRepo.Update(ctx, wf); err != nil {
-		return nil, fmt.Errorf("failed to update workflow %s: %w", id, err)
+		return tx.Workflows().Update(ctx, wf)
+	}); err != nil {
+		return nil, err
 	}
 
 	return dto.ToWorkflowResponse(wf), nil
 }
 
 func (s *workflowServiceImpl) DeleteWorkflow(ctx context.Context, id uuid.UUID) error {
-	if err := s.workflowRepo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete workflow %s: %w", id, err)
-	}
-	return nil
+	return s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		wf, err := tx.Workflows().GetByID(ctx, id)
+		if err != nil {
+			return domain.ErrWorkflowNotFound
+		}
+		if wf.IsActive {
+			return domain.ErrWorkflowActive
+		}
+		return tx.Workflows().Delete(ctx, id)
+	})
 }
 
 func (s *workflowServiceImpl) ToggleWorkflow(ctx context.Context, id uuid.UUID) (*dto.WorkflowResponse, error) {
-	wf, err := s.workflowRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get workflow %s for toggle: %w", id, err)
+	if err := s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		wf, err := tx.Workflows().GetByID(ctx, id)
+		if err != nil {
+			return domain.ErrWorkflowNotFound
+		}
+
+		wf.IsActive = !wf.IsActive
+		wf.UpdatedAt = time.Now()
+
+		return tx.Workflows().Update(ctx, wf)
+	}); err != nil {
+		return nil, err
 	}
 
-	wf.IsActive = !wf.IsActive
-	wf.UpdatedAt = time.Now()
-
-	if err := s.workflowRepo.Update(ctx, wf); err != nil {
-		return nil, fmt.Errorf("failed to update workflow %s after toggle: %w", id, err)
-	}
-
+	wf, _ := s.workflowRepo.GetByID(ctx, id)
 	return dto.ToWorkflowResponse(wf), nil
 }
 
 // --- Step operations ---
 
 func (s *workflowServiceImpl) AddStep(ctx context.Context, workflowID uuid.UUID, req dto.CreateStepRequest) (*dto.StepResponse, error) {
-	// Verify workflow exists
-	if _, err := s.workflowRepo.GetByID(ctx, workflowID); err != nil {
-		return nil, fmt.Errorf("workflow %s not found: %w", workflowID, err)
-	}
+	var step *entity.WorkflowStep
+	if err := s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		// Verify workflow exists
+		if _, err := tx.Workflows().GetByID(ctx, workflowID); err != nil {
+			return domain.ErrWorkflowNotFound
+		}
 
-	step := &entity.WorkflowStep{
-		ID:           uuid.New(),
-		WorkflowID:   workflowID,
-		ParentStepID: req.ParentStepID,
-		StepType:     req.StepType,
-		Config:       req.Config,
-		Order:        req.Order,
-		CreatedAt:    time.Now(),
-	}
+		step = &entity.WorkflowStep{
+			ID:           uuid.New(),
+			WorkflowID:   workflowID,
+			ParentStepID: req.ParentStepID,
+			StepType:     req.StepType,
+			Config:       req.Config,
+			Order:        req.Order,
+			CreatedAt:    time.Now(),
+		}
 
-	if err := s.workflowRepo.AddStep(ctx, step); err != nil {
-		return nil, fmt.Errorf("failed to add step to workflow %s: %w", workflowID, err)
+		return tx.Workflows().AddStep(ctx, step)
+	}); err != nil {
+		return nil, err
 	}
 
 	resp := dto.ToStepResponse(step)
@@ -125,23 +148,23 @@ func (s *workflowServiceImpl) AddStep(ctx context.Context, workflowID uuid.UUID,
 }
 
 func (s *workflowServiceImpl) UpdateStep(ctx context.Context, stepID uuid.UUID, req dto.UpdateStepRequest) (*dto.StepResponse, error) {
-	// We need to find the step — get all steps from its workflow
-	// For simplicity, do a direct update via the step fields
 	step := &entity.WorkflowStep{
 		ID: stepID,
 	}
 
-	if req.StepType != nil {
-		step.StepType = *req.StepType
-	}
-	if req.Config != nil {
-		step.Config = req.Config
-	}
-	if req.Order != nil {
-		step.Order = *req.Order
-	}
+	if err := s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		if req.StepType != nil {
+			step.StepType = *req.StepType
+		}
+		if req.Config != nil {
+			step.Config = req.Config
+		}
+		if req.Order != nil {
+			step.Order = *req.Order
+		}
 
-	if err := s.workflowRepo.UpdateStep(ctx, step); err != nil {
+		return tx.Workflows().UpdateStep(ctx, step)
+	}); err != nil {
 		return nil, fmt.Errorf("failed to update step %s: %w", stepID, err)
 	}
 
@@ -150,8 +173,7 @@ func (s *workflowServiceImpl) UpdateStep(ctx context.Context, stepID uuid.UUID, 
 }
 
 func (s *workflowServiceImpl) DeleteStep(ctx context.Context, stepID uuid.UUID) error {
-	if err := s.workflowRepo.DeleteStep(ctx, stepID); err != nil {
-		return fmt.Errorf("failed to delete step %s: %w", stepID, err)
-	}
-	return nil
+	return s.uow.Execute(ctx, func(tx repository.WorkflowTxRepository) error {
+		return tx.Workflows().DeleteStep(ctx, stepID)
+	})
 }

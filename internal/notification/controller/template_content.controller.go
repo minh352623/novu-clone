@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"net/http"
 
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/controller/dto"
@@ -35,12 +34,12 @@ func NewTemplateContentController(tmplManager *service.TemplateManager) *Templat
 func (c *TemplateContentController) AddContent(ctx *gin.Context) (interface{}, error) {
 	templateID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid template ID", err)
+		return nil, response.NewBadRequestError("Invalid template ID")
 	}
 
 	var req dto.CreateTemplateContentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	content := entity.NewTemplateContent(
@@ -54,38 +53,26 @@ func (c *TemplateContentController) AddContent(ctx *gin.Context) (interface{}, e
 	)
 
 	if err := c.tmplManager.AddContent(ctx.Request.Context(), templateID, content); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToTemplateContentResponse(content), nil
 }
 
-// UpdateContent godoc
-// @Summary Update template content for a language
-// @Description Update subject and body for a specific language
-// @Tags Templates
-// @Accept json
-// @Produce json
-// @Param id path string true "Template ID"
-// @Param lang path string true "Language Code"
-// @Param body body dto.UpdateTemplateContentRequest true "Content update"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Router /notifications/templates/{id}/content/{lang} [put]
 func (c *TemplateContentController) UpdateContent(ctx *gin.Context) (interface{}, error) {
 	templateID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid template ID", err)
+		return nil, response.NewBadRequestError("Invalid template ID")
 	}
 
 	lang := ctx.Param("lang")
 	if lang == "" {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Language code is required", nil)
+		return nil, response.NewBadRequestError("Language code is required")
 	}
 
 	var req dto.UpdateTemplateContentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Build partial entity
@@ -104,36 +91,27 @@ func (c *TemplateContentController) UpdateContent(ctx *gin.Context) (interface{}
 	}
 
 	if err := c.tmplManager.UpdateContent(ctx.Request.Context(), templateID, lang, update); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return map[string]string{"status": "updated"}, nil
 }
 
-// ListLanguages godoc
-// @Summary List available languages for a template
-// @Description Returns all language codes with content for a template
-// @Tags Templates
-// @Produce json
-// @Param id path string true "Template ID"
-// @Success 200 {object} dto.AvailableLanguagesResponse
-// @Failure 400 {object} map[string]string
-// @Router /notifications/templates/{id}/languages [get]
 func (c *TemplateContentController) ListLanguages(ctx *gin.Context) (interface{}, error) {
 	templateID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid template ID", err)
+		return nil, response.NewBadRequestError("Invalid template ID")
 	}
 
 	langs, err := c.tmplManager.ListLanguages(ctx.Request.Context(), templateID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Get template to include version in response
 	tmpl, err := c.tmplManager.GetTemplate(ctx.Request.Context(), uuid.Nil, templateID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	version := 1

@@ -227,7 +227,16 @@ func (w *WorkflowExecutor) pollDigest(ctx context.Context) {
 	}
 
 	for _, stepExec := range stepExecs {
-		w.flushDigestStep(ctx, stepExec)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					global.Logger.Error("WorkflowExecutor: panic recovered in digest flush",
+						"panic", r,
+						"stepExecutionID", stepExec.ID.String())
+				}
+			}()
+			w.flushDigestStep(ctx, stepExec)
+		}()
 	}
 }
 

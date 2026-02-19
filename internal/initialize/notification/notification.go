@@ -7,6 +7,7 @@ import (
 	"CONVERDA/internal/notification/application/service/impl"
 	"CONVERDA/internal/notification/application/worker"
 	"CONVERDA/internal/notification/controller"
+	"CONVERDA/internal/notification/infrastructure/adapter"
 	"CONVERDA/internal/notification/infrastructure/persistence/repository"
 	"CONVERDA/internal/notification/infrastructure/provider"
 
@@ -30,16 +31,18 @@ func InitNotificationModule(db *gorm.DB, router *gin.RouterGroup) {
 	jobRepo := repository.NewNotificationJobRepository(db)
 
 	// 2. Domain Services
+	notifUoW := repository.NewNotificationUnitOfWork(db)
 	tmplManager := service.NewTemplateManager(tmplRepo, layoutRepo)
 	dispatcher := provider.NewDispatcher(configRepo)
-	groupManager := impl.NewGroupManager(groupRepo)
-	layoutManager := impl.NewLayoutManager(layoutRepo)
+	dispatcherAdapter := adapter.NewDispatcherAdapter(dispatcher)
+	groupManager := impl.NewGroupManager(groupRepo, notifUoW)
+	layoutManager := impl.NewLayoutManager(layoutRepo, notifUoW)
 
 	// 3. Application Service
-	NotificationService = impl.NewNotificationService(notifRepo, tmplManager, dispatcher)
+	NotificationService = impl.NewNotificationService(notifRepo, notifUoW, tmplManager, dispatcherAdapter)
 
 	// Now init JobScheduler
-	jobScheduler := impl.NewJobScheduler(jobRepo, NotificationService, tmplManager)
+	jobScheduler := impl.NewJobScheduler(jobRepo, notifUoW, NotificationService, tmplManager)
 
 	// 4. Webhook Dispatcher + Retry Worker
 	webhookRepo := repository.NewWebhookRepository(db)

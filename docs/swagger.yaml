@@ -922,17 +922,6 @@ definitions:
       total_conversations:
         type: integer
     type: object
-  CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse:
-    properties:
-      languages:
-        items:
-          type: string
-        type: array
-      template_id:
-        type: string
-      version:
-        type: integer
-    type: object
   CONVERDA_internal_notification_controller_dto.CreateGroupRequest:
     properties:
       description:
@@ -1098,19 +1087,6 @@ definitions:
       variables_schema:
         additionalProperties: true
         type: object
-    type: object
-  CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest:
-    properties:
-      body_html:
-        type: string
-      body_push:
-        items:
-          type: integer
-        type: array
-      body_text:
-        type: string
-      subject:
-        type: string
     type: object
   CONVERDA_internal_r2_service_dto.ImageDTO:
     properties:
@@ -2686,29 +2662,6 @@ paths:
       tags:
       - Notification
   /notifications/layouts:
-    get:
-      description: List notification layouts
-      parameters:
-      - description: Page
-        in: query
-        name: page
-        type: integer
-      - description: Limit
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.PaginatedResponse'
-      security:
-      - BearerAuth: []
-      summary: List Notification Layouts
-      tags:
-      - Notification
     post:
       consumes:
       - application/json
@@ -2733,44 +2686,6 @@ paths:
       tags:
       - Notification
   /notifications/layouts/{id}:
-    delete:
-      description: Delete a notification layout
-      parameters:
-      - description: Layout ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-      security:
-      - BearerAuth: []
-      summary: Delete Notification Layout
-      tags:
-      - Notification
-    get:
-      description: Get a notification layout by ID
-      parameters:
-      - description: Layout ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.LayoutResponse'
-      security:
-      - BearerAuth: []
-      summary: Get Notification Layout
-      tags:
-      - Notification
     patch:
       consumes:
       - application/json
@@ -2852,71 +2767,6 @@ paths:
               type: string
             type: object
       summary: Add template content for a new language
-      tags:
-      - Templates
-  /notifications/templates/{id}/content/{lang}:
-    put:
-      consumes:
-      - application/json
-      description: Update subject and body for a specific language
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Language Code
-        in: path
-        name: lang
-        required: true
-        type: string
-      - description: Content update
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Update template content for a language
-      tags:
-      - Templates
-  /notifications/templates/{id}/languages:
-    get:
-      description: Returns all language codes with content for a template
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: List available languages for a template
       tags:
       - Templates
   /pricing-plans:

@@ -1,0 +1,117 @@
+---
+description: Rules for application service files
+globs: ["internal/*/application/service/*.go"]
+alwaysApply: false
+---
+
+# Application Service Rules
+
+You are writing an application service in the **Application Layer**.
+This layer orchestrates use cases. It coordinates between domain and infrastructure.
+
+## Your responsibilities
+- Implement use cases (one public method per use case)
+- Call domain entities' business methods
+- Call repository interfaces (via injected interfaces, NOT concrete types)
+- Emit events for async side effects (email, notifications)
+- Handle transaction boundaries (via UnitOfWork interface for multi-table writes)
+- Convert domain entities to DTOs for the return value
+
+## What you MUST NOT do
+- Import `net/http`, `github.com/gin-gonic/gin`, or any HTTP framework
+- Import infrastructure packages directly (no `infrastructure/persistence/...`)
+- Import `gorm.io/gorm` — this project does not use GORM
+- Throw HTTP status codes or HTTP exceptions
+- Call another module's repository directly
+
+## Interface definition (always create the interface first)
+```go
+// i_[name]_service.go
+package service
+
+import (
+    "context"
+    "[module]/internal/[domain]/controller/dto"
+)
+
+type I[Name]Service interface {
+    Create(ctx context.Context, req *dto.Create[Name]Req) (*dto.[Name]Resp, error)
+    FindByID(ctx context.Context, id string) (*dto.[Name]Resp, error)
+    List(ctx context.Context, filter *dto.List[Name]Filter) (*dto.PaginatedResp[[Name]Resp], error)
+    Update(ctx context.Context, id string, req *dto.Update[Name]Req) (*dto.[Name]Resp, error)
+    Delete(ctx context.Context, id string) error
+}
+```
+
+## Implementation pattern
+```go
+// [name]_service.go
+package service
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "[module]/internal/[domain]/domain"
+    domainEntity "[module]/internal/[domain]/domain/model/entity"
+    domainRepo "[module]/internal/[domain]/domain/repository"
+    "[module]/internal/[domain]/controller/dto"
+)
+
+type [Name]Service struct {
+    repo      domainRepo.I[Name]Repository  // INTERFACE, not concrete type
+    eventBus  event.IBus                    // INTERFACE
+    // other dependencies — all interfaces
+}
+
+func New[Name]Service(repo domainRepo.I[Name]Repository, bus event.IBus) I[Name]Service {
+    return &[Name]Service{repo: repo, eventBus: bus}
+}
+
+func (s *[Name]Service) Create(ctx context.Context, req *dto.Create[Name]Req) (*dto.[Name]Resp, error) {
+    // 1. Business validation (if not in entity constructor)
+    if req.Amount <= 0 {
+        return nil, domain.ErrInvalidAmount
+    }
+
+    // 2. Create domain entity
+    e := &domainEntity.[Name]{
+        ID:        uuid.New().String(),
+        // ... map from req
+        CreatedAt: time.Now(),
+    }
+
+    // 3. Persist
+    if err := s.repo.Save(ctx, e); err != nil {
+        return nil, fmt.Errorf("[name]Service.Create: %w", err)
+    }
+
+    // 4. Side effects (non-blocking)
+    s.eventBus.Emit("[name].created", &event.[Name]CreatedEvent{ID: e.ID})
+
+    // 5. Return DTO (not entity)
+    return toResp(e), nil
+}
+
+// toResp is private — converts entity to DTO
+func toResp(e *domainEntity.[Name]) *dto.[Name]Resp {
+    return &dto.[Name]Resp{
+        ID: e.ID,
+        // map fields
+    }
+}
+```
+
+## Error handling in service
+```go
+// Wrap errors with operation context
+return nil, fmt.Errorf("[name]Service.FindByID id=%s: %w", id, err)
+
+// Domain errors: just return them directly (they're already descriptive)
+if !entity.IsValid() {
+    return nil, domain.ErrInvalidState
+}
+
+// Never: return http.StatusBadRequest, nil — wrong layer
+```

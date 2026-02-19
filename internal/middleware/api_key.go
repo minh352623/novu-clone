@@ -54,9 +54,9 @@ func APIKeyMiddleware(apiKeyService service.APIKeyService, metricsService servic
 				}
 			}()
 
-			// Use a background context as the request context may be cancelled
-			// In a real production app, you might want to use a more robust queue/buffer
-			_ = metricsService.RecordUsage(context.Background(), key.AppID, key.EnvironmentID, providerType, "outbound", ctx.Writer.Status())
+			// Use context.WithoutCancel to preserve trace/correlation context while allowing the task to outlive the request
+			bgCtx := context.WithoutCancel(ctx.Request.Context())
+			_ = metricsService.RecordUsage(bgCtx, key.AppID, key.EnvironmentID, providerType, "outbound", ctx.Writer.Status())
 		}()
 	}
 }

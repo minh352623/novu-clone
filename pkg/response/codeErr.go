@@ -66,6 +66,15 @@ func NewNotFoundError(message string) *APIError {
 	}
 }
 
+// NewConflictError creates a 409 Conflict error
+func NewConflictError(message string) *APIError {
+	return &APIError{
+		StatusCode: http.StatusConflict,
+		Message:    message,
+		Err:        message,
+	}
+}
+
 // NewInternalServerError creates a 500 Internal Server Error
 func NewInternalServerError(message string) *APIError {
 	return &APIError{

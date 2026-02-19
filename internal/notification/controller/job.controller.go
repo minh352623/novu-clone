@@ -26,7 +26,7 @@ func NewJobController(scheduler service.JobScheduler) *JobController {
 func (c *JobController) ScheduleJob(ctx *gin.Context) (interface{}, error) {
 	var req dto.ScheduleJobRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	envID := uuid.Nil
@@ -40,7 +40,7 @@ func (c *JobController) ScheduleJob(ctx *gin.Context) (interface{}, error) {
 		}
 	}
 	if envID == uuid.Nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "environment_id is required", nil)
+		return nil, response.NewBadRequestError("environment_id is required")
 	}
 
 	var templateID *uuid.UUID
@@ -70,8 +70,8 @@ func (c *JobController) ScheduleJob(ctx *gin.Context) (interface{}, error) {
 					global.Logger.Error("job_controller: panic recovered in background processing", "panic", r, "jobID", job.ID.String())
 				}
 			}()
-			// Create a background context with timeout?
-			bgCtx := context.Background()
+			// Use context.WithoutCancel to preserve trace/correlation context while allowing the task to outlive the request
+			bgCtx := context.WithoutCancel(ctx.Request.Context())
 			_ = c.scheduler.ProcessJob(bgCtx, job.ID)
 		}()
 		job.Status = entity.JobStatusProcessing // Optimistic update for response or fetch fresh?
@@ -86,7 +86,7 @@ func (c *JobController) ListJobs(ctx *gin.Context) (interface{}, error) {
 		envID = eID.(uuid.UUID)
 	}
 	if envID == uuid.Nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "environment_id is required", nil)
+		return nil, response.NewBadRequestError("environment_id is required")
 	}
 
 	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
@@ -94,7 +94,7 @@ func (c *JobController) ListJobs(ctx *gin.Context) (interface{}, error) {
 
 	jobs, total, err := c.scheduler.ListJobs(ctx, envID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	jobResponses := make([]*dto.JobResponse, 0, len(jobs))
@@ -116,15 +116,15 @@ func (c *JobController) GetJob(ctx *gin.Context) (interface{}, error) {
 
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "invalid id", err)
+		return nil, response.NewBadRequestError("invalid id")
 	}
 
 	job, err := c.scheduler.GetJob(ctx, envID, id)
 	if err != nil {
-		return nil, err
+		return nil, response.NewInternalServerError(err.Error())
 	}
 	if job == nil {
-		return nil, response.NewAPIError(http.StatusNotFound, "job not found", nil)
+		return nil, response.NewNotFoundError("job not found")
 	}
 
 	return toJobResponse(job), nil
@@ -138,11 +138,11 @@ func (c *JobController) CancelJob(ctx *gin.Context) (interface{}, error) {
 
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "invalid id", err)
+		return nil, response.NewBadRequestError("invalid id")
 	}
 
 	if err := c.scheduler.CancelJob(ctx, envID, id); err != nil {
-		return nil, err
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "cancelled"}, nil

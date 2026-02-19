@@ -15,10 +15,11 @@ import (
 
 type groupManager struct {
 	repo repository.NotificationGroupRepository
+	uow  repository.NotificationUnitOfWork
 }
 
-func NewGroupManager(repo repository.NotificationGroupRepository) service.GroupManager {
-	return &groupManager{repo: repo}
+func NewGroupManager(repo repository.NotificationGroupRepository, uow repository.NotificationUnitOfWork) service.GroupManager {
+	return &groupManager{repo: repo, uow: uow}
 }
 
 func (s *groupManager) CreateGroup(ctx context.Context, envID uuid.UUID, name, key, description string, isDefault bool) (*entity.NotificationGroup, error) {
@@ -45,47 +46,58 @@ func (s *groupManager) CreateGroup(ctx context.Context, envID uuid.UUID, name, k
 		UpdatedAt:     time.Now(),
 	}
 
-	if err := s.repo.Create(ctx, group); err != nil {
-		return nil, fmt.Errorf("failed to create group: %w", err)
+	if err := s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		// Check if key exists again within transaction
+		existing, err := tx.Groups().GetByKey(ctx, envID, key)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return domain.ErrGroupDuplicateKey
+		}
+		return tx.Groups().Create(ctx, group)
+	}); err != nil {
+		return nil, err
 	}
 	return group, nil
 }
 
 func (s *groupManager) UpdateGroup(ctx context.Context, envID uuid.UUID, id uuid.UUID, name, description string) error {
-	group, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to fetch group %s: %w", id, err)
-	}
-	if group == nil {
-		return domain.ErrGroupNotFound
-	}
-	if group.EnvironmentID != envID {
-		return domain.ErrGroupNotInEnv
-	}
+	return s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		group, err := tx.Groups().GetByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch group %s: %w", id, err)
+		}
+		if group == nil {
+			return domain.ErrGroupNotFound
+		}
+		if group.EnvironmentID != envID {
+			return domain.ErrGroupNotInEnv
+		}
 
-	group.Name = name
-	group.Description = description
-	group.UpdatedAt = time.Now()
+		group.Name = name
+		group.Description = description
+		group.UpdatedAt = time.Now()
 
-	if err := s.repo.Update(ctx, group); err != nil {
-		return fmt.Errorf("failed to update group %s: %w", id, err)
-	}
-	return nil
+		return tx.Groups().Update(ctx, group)
+	})
 }
 
 func (s *groupManager) DeleteGroup(ctx context.Context, envID uuid.UUID, id uuid.UUID) error {
-	group, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to fetch group %s: %w", id, err)
-	}
-	if group == nil {
-		return nil // Already deleted
-	}
-	if group.EnvironmentID != envID {
-		return domain.ErrGroupNotInEnv
-	}
+	return s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		group, err := tx.Groups().GetByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch group %s: %w", id, err)
+		}
+		if group == nil {
+			return nil // Already deleted
+		}
+		if group.EnvironmentID != envID {
+			return domain.ErrGroupNotInEnv
+		}
 
-	return s.repo.Delete(ctx, id)
+		return tx.Groups().Delete(ctx, id)
+	})
 }
 
 func (s *groupManager) GetGroup(ctx context.Context, envID uuid.UUID, id uuid.UUID) (*entity.NotificationGroup, error) {

@@ -1,0 +1,108 @@
+---
+description: Rules for repository implementation files in the Infrastructure layer
+globs: ["internal/*/infrastructure/persistence/repository/*.go"]
+alwaysApply: false
+---
+
+# Repository Implementation Rules
+
+You are writing a repository implementation in the **Infrastructure Layer**.
+This file implements a domain repository interface using sqlc-generated queries.
+
+## Your responsibilities
+- Implement the domain `IXxxRepository` interface
+- Translate between sqlc rows ↔ domain entities (via private `mapToEntity` functions)
+- Handle database-specific errors and map them to domain errors
+- Never expose sqlc types outside this file
+
+## What you MUST NOT do
+- Use GORM — this project uses sqlc exclusively
+- Write raw SQL strings — always use sqlc-generated methods
+- Return sqlc row types to callers — always map to domain entity
+- Contain business logic — that belongs in application layer
+- Know about HTTP or application concerns
+
+## Required pattern
+```go
+package repository
+
+import (
+    "context"
+    "errors"
+    "fmt"
+
+    "github.com/google/uuid"
+    "github.com/jackc/pgx/v5"
+
+    "[module]/internal/[domain]/domain"
+    domainRepo "[module]/internal/[domain]/domain/repository"
+    domainEntity "[module]/internal/[domain]/domain/model/entity"
+    "[module]/internal/[domain]/infrastructure/persistence/sqlcgen"
+)
+
+type [Name]Repository struct {
+    q *sqlcgen.Queries
+}
+
+// Constructor returns the INTERFACE — callers see interface, not concrete type
+func New[Name]Repository(q *sqlcgen.Queries) domainRepo.I[Name]Repository {
+    return &[Name]Repository{q: q}
+}
+
+func (r *[Name]Repository) FindByID(ctx context.Context, id string) (*domainEntity.[Name], error) {
+    uid, err := uuid.Parse(id)
+    if err != nil {
+        return nil, domain.Err[Name]NotFound // invalid UUID treated as not found
+    }
+
+    row, err := r.q.Get[Name]ByID(ctx, uid)
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, domain.Err[Name]NotFound
+        }
+        return nil, fmt.Errorf("[name]Repo.FindByID id=%s: %w", id, err)
+    }
+
+    return r.mapToEntity(row), nil
+}
+
+func (r *[Name]Repository) Save(ctx context.Context, e *domainEntity.[Name]) error {
+    uid, _ := uuid.Parse(e.ID)
+    _, err := r.q.Create[Name](ctx, sqlcgen.Create[Name]Params{
+        ID:    uid,
+        // map entity fields to sqlc params
+    })
+    if err != nil {
+        return fmt.Errorf("[name]Repo.Save id=%s: %w", e.ID, err)
+    }
+    return nil
+}
+
+// mapToEntity converts sqlc row → domain entity
+// PRIVATE: never used outside this file
+func (r *[Name]Repository) mapToEntity(row *sqlcgen.Get[Name]ByIDRow) *domainEntity.[Name] {
+    return &domainEntity.[Name]{
+        ID:        row.ID.String(),
+        CreatedAt: row.CreatedAt.Time,
+        UpdatedAt: row.UpdatedAt.Time,
+        // map other fields
+    }
+}
+```
+
+## Error mapping rules
+```go
+// pgx.ErrNoRows → domain.ErrXxxNotFound (always check this first)
+if errors.Is(err, pgx.ErrNoRows) {
+    return nil, domain.ErrOrderNotFound
+}
+
+// unique constraint violation → domain duplicate error
+var pgErr *pgconn.PgError
+if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+    return nil, domain.ErrDuplicateEmail
+}
+
+// everything else → wrap with location context
+return fmt.Errorf("[name]Repo.[Method]: %w", err)
+```

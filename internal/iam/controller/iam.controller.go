@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"net/http"
-
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/controller/dto"
 	"CONVERDA/internal/iam/domain/repository"
@@ -40,15 +38,15 @@ func NewAuthController(authService service.AuthService, tokenService service.Tok
 func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 	var req dto.RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	user, err := c.authService.Register(ctx.Request.Context(), req.Email, req.Password, req.FullName)
 	if err != nil {
 		if err == service.ErrUserAlreadyExists {
-			return nil, response.NewAPIError(http.StatusConflict, err.Error(), err)
+			return nil, response.NewConflictError(err.Error())
 		}
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Generate tokens for auto-login
@@ -62,7 +60,7 @@ func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 	}
 	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate refresh token", err)
+		return nil, response.NewInternalServerError("Failed to generate refresh token")
 	}
 
 	return dto.AuthResponse{
@@ -85,23 +83,23 @@ func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 func (c *AuthController) Login(ctx *gin.Context) (interface{}, error) {
 	var req dto.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	user, err := c.authService.Login(ctx.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Invalid credentials", err)
+		return nil, response.NewUnauthorizedError("Invalid credentials")
 	}
 
 	// Generate JWT tokens
 	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate token", err)
+		return nil, response.NewInternalServerError("Failed to generate token")
 	}
 
 	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate refresh token", err)
+		return nil, response.NewInternalServerError("Failed to generate refresh token")
 	}
 
 	return dto.AuthResponse{
@@ -126,21 +124,21 @@ func (c *AuthController) Login(ctx *gin.Context) (interface{}, error) {
 func (c *AuthController) ChangePassword(ctx *gin.Context) (interface{}, error) {
 	var req dto.ChangePasswordRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Get user ID from context (set by auth middleware)
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
+		return nil, response.NewUnauthorizedError("Unauthorized")
 	}
 
 	err := c.authService.ChangePassword(ctx.Request.Context(), userID.(uuid.UUID), req.OldPassword, req.NewPassword)
 	if err != nil {
 		if err == service.ErrInvalidCredentials {
-			return nil, response.NewAPIError(http.StatusBadRequest, "Current password is incorrect", err)
+			return nil, response.NewBadRequestError("Current password is incorrect")
 		}
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return gin.H{"message": "Password changed successfully"}, nil
@@ -159,18 +157,18 @@ func (c *AuthController) ChangePassword(ctx *gin.Context) (interface{}, error) {
 func (c *AuthController) RefreshToken(ctx *gin.Context) (interface{}, error) {
 	var req dto.RefreshTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	userID, email, err := c.tokenService.ValidateRefreshToken(ctx.Request.Context(), req.RefreshToken)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Invalid or expired refresh token", err)
+		return nil, response.NewUnauthorizedError("Invalid or expired refresh token")
 	}
 
 	// Generate new access token
 	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), userID, email)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, "Failed to generate token", err)
+		return nil, response.NewInternalServerError("Failed to generate token")
 	}
 
 	// Optionally rotate refresh token here
@@ -199,15 +197,15 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) (interface{}, error) {
 func (c *AuthController) Me(ctx *gin.Context) (interface{}, error) {
 	userID, exists := ctx.Get("user_id") // Middleware ensures UUID type now
 	if !exists {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
+		return nil, response.NewUnauthorizedError("Unauthorized")
 	}
 
 	user, err := c.authService.GetUser(ctx.Request.Context(), userID.(uuid.UUID))
 	if err != nil {
 		if err == service.ErrUserNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, "User not found", err)
+			return nil, response.NewNotFoundError("User not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToUserResponse(user), nil
@@ -242,21 +240,21 @@ func NewTenantController(tenantService service.TenantService, memberService serv
 func (c *TenantController) CreateTenant(ctx *gin.Context) (interface{}, error) {
 	var req dto.CreateTenantRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Get user ID from context
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
+		return nil, response.NewUnauthorizedError("Unauthorized")
 	}
 
 	tenant, err := c.tenantService.CreateTenant(ctx.Request.Context(), req.Name, req.Slug, userID.(uuid.UUID))
 	if err != nil {
 		if err == service.ErrTenantSlugExists {
-			return nil, response.NewAPIError(http.StatusConflict, err.Error(), err)
+			return nil, response.NewConflictError(err.Error())
 		}
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToTenantResponse(tenant), nil
@@ -276,15 +274,15 @@ func (c *TenantController) GetTenant(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
+		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
 	tenant, err := c.tenantService.GetTenant(ctx.Request.Context(), id)
 	if err != nil {
 		if err == service.ErrTenantNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+			return nil, response.NewNotFoundError("Tenant not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToTenantResponse(tenant), nil
@@ -306,21 +304,21 @@ func (c *TenantController) UpdateTenant(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
+		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
 	var req dto.CreateTenantRequest // Using Create DTO for simplicity, or Create UpdateDTO
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// 1. Get existing tenant to verify existence
 	tenant, err := c.tenantService.GetTenant(ctx.Request.Context(), id)
 	if err != nil {
 		if err == service.ErrTenantNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+			return nil, response.NewNotFoundError("Tenant not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	// 2. Update fields
@@ -331,9 +329,9 @@ func (c *TenantController) UpdateTenant(ctx *gin.Context) (interface{}, error) {
 	// Service should handle validation (slug uniqueness)
 	if err := c.tenantService.UpdateTenant(ctx.Request.Context(), tenant); err != nil {
 		if err == service.ErrTenantSlugExists {
-			return nil, response.NewAPIError(http.StatusConflict, err.Error(), err)
+			return nil, response.NewConflictError(err.Error())
 		}
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToTenantResponse(tenant), nil
@@ -353,14 +351,14 @@ func (c *TenantController) DeleteTenant(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
+		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
 	if err := c.tenantService.DeleteTenant(ctx.Request.Context(), id); err != nil {
 		if err == service.ErrTenantNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, err.Error(), err)
+			return nil, response.NewNotFoundError("Tenant not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return gin.H{"message": "Tenant deleted successfully"}, nil
@@ -388,7 +386,7 @@ func (c *TenantController) ListTenants(ctx *gin.Context) (interface{}, error) {
 
 	tenants, total, err := c.tenantService.ListTenants(ctx.Request.Context(), filters)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.NewPaginatedResponse(
@@ -410,12 +408,12 @@ func (c *TenantController) ListTenants(ctx *gin.Context) (interface{}, error) {
 func (c *TenantController) GetMyTenants(ctx *gin.Context) (interface{}, error) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
+		return nil, response.NewUnauthorizedError("Unauthorized")
 	}
 
 	tenants, err := c.tenantService.GetUserTenants(ctx.Request.Context(), userID.(uuid.UUID))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToTenantResponseList(tenants), nil
@@ -434,12 +432,12 @@ func (c *TenantController) GetMembers(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	tenantID, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
+		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
 	members, err := c.memberService.GetMembers(ctx.Request.Context(), tenantID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToTenantMemberResponseList(members), nil
@@ -462,17 +460,17 @@ func (c *TenantController) AddMember(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	tenantID, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
+		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
 	var req dto.AddMemberRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	member, err := c.memberService.AddMember(ctx.Request.Context(), tenantID, req.UserID, req.RoleID, req.AppID)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToTenantMemberResponse(member), nil
@@ -495,25 +493,25 @@ func (c *TenantController) InviteMember(ctx *gin.Context) (interface{}, error) {
 	idStr := ctx.Param("id")
 	tenantID, err := uuid.Parse(idStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid tenant ID", err)
+		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
 	var req dto.InviteMemberRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
+		return nil, response.NewUnauthorizedError("Unauthorized")
 	}
 
 	invite, err := c.memberService.InviteMember(ctx.Request.Context(), tenantID, req.Email, req.RoleID, req.AppID, userID.(uuid.UUID))
 	if err != nil {
 		if err == service.ErrUnauthorized {
-			return nil, response.NewAPIError(http.StatusForbidden, "Insufficient permissions", err)
+			return nil, response.NewForbiddenError("Insufficient permissions")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToTenantInvitationResponse(invite), nil
@@ -533,18 +531,18 @@ func (c *TenantController) InviteMember(ctx *gin.Context) (interface{}, error) {
 func (c *TenantController) AcceptInvitation(ctx *gin.Context) (interface{}, error) {
 	var req dto.AcceptInvitationRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		return nil, response.NewAPIError(http.StatusUnauthorized, "Unauthorized", nil)
+		return nil, response.NewUnauthorizedError("Unauthorized")
 	}
 
 	member, err := c.memberService.AcceptInvitation(ctx.Request.Context(), req.Token, userID.(uuid.UUID))
 	if err != nil {
 		// Handle errors like Expired, InvalidToken etc.
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	return dto.ToTenantMemberResponse(member), nil

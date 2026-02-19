@@ -9,6 +9,7 @@ import (
 
 	"CONVERDA/internal/messaging/application/service"
 	"CONVERDA/internal/messaging/controller/dto"
+	"CONVERDA/internal/messaging/domain"
 	"CONVERDA/internal/messaging/domain/model/entity"
 	"CONVERDA/internal/messaging/infrastructure/gateway"
 	"CONVERDA/pkg/response"
@@ -38,7 +39,7 @@ func NewConversationController(svc service.ConversationService, hub *gateway.Hub
 func (c *ConversationController) InboundMessage(ctx *gin.Context) (interface{}, error) {
 	var req dto.InboundMessageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Context Extraction (from EnvKeyAuth middleware)
@@ -47,7 +48,7 @@ func (c *ConversationController) InboundMessage(ctx *gin.Context) (interface{}, 
 
 	msg, err := c.svc.ReceiveMessage(ctx.Request.Context(), tenantID.(uuid.UUID), envID.(uuid.UUID), req.SubscriberKey, req.Channel, req.Content, nil)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	go c.broadcastMessage(context.Background(), msg)
@@ -69,12 +70,12 @@ func (c *ConversationController) InboundMessage(ctx *gin.Context) (interface{}, 
 func (c *ConversationController) ReplyMessage(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	var req dto.ReplyMessageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Context Extraction
@@ -91,7 +92,10 @@ func (c *ConversationController) ReplyMessage(ctx *gin.Context) (interface{}, er
 	// threadID is resolved by service, but we can pass uuid.Nil or from context if available
 	msg, err := c.svc.ReplyMessage(ctx.Request.Context(), tenantID, uuid.Nil, threadID, agentID, req.Content)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrThreadResolved {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	go c.broadcastMessage(context.Background(), msg)
@@ -113,12 +117,12 @@ func (c *ConversationController) ReplyMessage(ctx *gin.Context) (interface{}, er
 func (c *ConversationController) AddInternalNote(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	var req dto.InternalNoteRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Context Extraction
@@ -141,7 +145,7 @@ func (c *ConversationController) AddInternalNote(ctx *gin.Context) (interface{},
 
 	msg, err := c.svc.AddInternalNote(ctx.Request.Context(), tenantID, envID, threadID, agentID, req.Content)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	go c.broadcastMessage(context.Background(), msg)
@@ -162,7 +166,7 @@ func (c *ConversationController) AddInternalNote(ctx *gin.Context) (interface{},
 func (c *ConversationController) CreateDirectChat(ctx *gin.Context) (interface{}, error) {
 	var req dto.CreateDirectChatRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	envID := uuid.Nil
@@ -177,7 +181,7 @@ func (c *ConversationController) CreateDirectChat(ctx *gin.Context) (interface{}
 
 	thread, err := c.svc.GetOrCreateDirectThread(ctx.Request.Context(), envID, agentID, req.Target.ID, req.Target.Type)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToThreadResponse(thread), nil
@@ -196,7 +200,7 @@ func (c *ConversationController) CreateDirectChat(ctx *gin.Context) (interface{}
 func (c *ConversationController) CreateGroupChat(ctx *gin.Context) (interface{}, error) {
 	var req dto.CreateGroupChatRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	envID := uuid.Nil
@@ -233,7 +237,7 @@ func (c *ConversationController) CreateGroupChat(ctx *gin.Context) (interface{},
 
 	thread, err := c.svc.CreateGroupThread(ctx.Request.Context(), envID, req.Name, participants)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToThreadResponse(thread), nil
@@ -253,12 +257,12 @@ func (c *ConversationController) CreateGroupChat(ctx *gin.Context) (interface{},
 func (c *ConversationController) UpdateGroupChat(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	var req dto.UpdateGroupChatRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	envID := uuid.Nil
@@ -267,7 +271,10 @@ func (c *ConversationController) UpdateGroupChat(ctx *gin.Context) (interface{},
 	}
 
 	if err := c.svc.UpdateGroupThread(ctx.Request.Context(), envID, threadID, req.Name); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrNotGroupThread {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "updated"}, nil
@@ -287,12 +294,12 @@ func (c *ConversationController) UpdateGroupChat(ctx *gin.Context) (interface{},
 func (c *ConversationController) AddGroupParticipants(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	var req dto.AddParticipantsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	var participants []*entity.ThreadParticipant
@@ -309,7 +316,7 @@ func (c *ConversationController) AddGroupParticipants(ctx *gin.Context) (interfa
 	}
 
 	if err := c.svc.AddGroupParticipants(ctx.Request.Context(), envID, threadID, participants); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "participants_added"}, nil
@@ -328,12 +335,12 @@ func (c *ConversationController) AddGroupParticipants(ctx *gin.Context) (interfa
 func (c *ConversationController) RemoveGroupParticipant(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	memberID, err := uuid.Parse(ctx.Param("memberID"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Member ID", err)
+		return nil, response.NewBadRequestError("Invalid Member ID")
 	}
 
 	envID := uuid.Nil
@@ -342,7 +349,7 @@ func (c *ConversationController) RemoveGroupParticipant(ctx *gin.Context) (inter
 	}
 
 	if err := c.svc.RemoveGroupParticipant(ctx.Request.Context(), envID, threadID, "user", memberID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "participant_removed"}, nil
@@ -360,7 +367,7 @@ func (c *ConversationController) RemoveGroupParticipant(ctx *gin.Context) (inter
 func (c *ConversationController) MarkAsRead(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	agentID := uuid.Nil
@@ -374,7 +381,10 @@ func (c *ConversationController) MarkAsRead(ctx *gin.Context) (interface{}, erro
 	}
 
 	if err := c.svc.MarkThreadRead(ctx.Request.Context(), envID, threadID, agentID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrParticipantNotFound {
+			return nil, response.NewNotFoundError("Participant not found")
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "read"}, nil
@@ -394,7 +404,7 @@ func (c *ConversationController) MarkAsRead(ctx *gin.Context) (interface{}, erro
 func (c *ConversationController) GetThread(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Pool ID", err)
+		return nil, response.NewBadRequestError("Invalid Pool ID")
 	}
 
 	envID := uuid.Nil
@@ -402,15 +412,15 @@ func (c *ConversationController) GetThread(ctx *gin.Context) (interface{}, error
 		envID = eID.(uuid.UUID)
 	}
 
-	cursor := ctx.Query("cursor")
-	if cursor != "" || ctx.Query("direction") != "" {
+	cursorStr := ctx.Query("cursor")
+	if cursorStr != "" || ctx.Query("direction") != "" {
 		// New Cursor Pagination Logic
 		direction := ctx.DefaultQuery("direction", "before")
 		limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
 
-		msgs, nextCursor, prevCursor, err := c.svc.GetMessagesByCursor(ctx.Request.Context(), envID, threadID, cursor, direction, limit)
+		msgs, nextCursor, prevCursor, err := c.svc.GetMessagesByCursor(ctx.Request.Context(), envID, threadID, cursorStr, direction, limit)
 		if err != nil {
-			return nil, response.NewAPIError(http.StatusInternalServerError, "failed to get messages", err)
+			return nil, response.NewInternalServerError("failed to get messages")
 		}
 
 		// Use map for response structure (or create DTO later)
@@ -431,7 +441,7 @@ func (c *ConversationController) GetThread(ctx *gin.Context) (interface{}, error
 
 	msgs, total, err := c.svc.GetMessagesByThread(ctx.Request.Context(), envID, threadID, limit, offset)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, "failed to get messages", err)
+		return nil, response.NewInternalServerError("failed to get messages")
 	}
 
 	return dto.NewPaginatedResponse(dto.ToMessageResponseList(msgs), page, limit, total), nil
@@ -473,7 +483,7 @@ func (c *ConversationController) ListConversations(ctx *gin.Context) (interface{
 
 	threads, total, err := c.svc.ListThreads(ctx.Request.Context(), tenantID, envID, status, assignedToMe, agentID, limit, offset)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, "failed to list threads", err)
+		return nil, response.NewInternalServerError("failed to list threads")
 	}
 
 	return dto.NewPaginatedResponse(dto.ToThreadResponseList(threads), page, limit, total), nil
@@ -493,7 +503,7 @@ func (c *ConversationController) ListConversations(ctx *gin.Context) (interface{
 func (c *ConversationController) AssignThread(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	var req dto.AssignConversationRequest
@@ -522,7 +532,10 @@ func (c *ConversationController) AssignThread(ctx *gin.Context) (interface{}, er
 	}
 
 	if err := c.svc.AssignThread(ctx.Request.Context(), tenantID, envID, threadID, assigneeID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrInvalidStatusTransition {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "assigned"}, nil
@@ -540,7 +553,7 @@ func (c *ConversationController) AssignThread(ctx *gin.Context) (interface{}, er
 func (c *ConversationController) UnassignThread(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	tenantID := uuid.Nil
@@ -554,7 +567,10 @@ func (c *ConversationController) UnassignThread(ctx *gin.Context) (interface{}, 
 	}
 
 	if err := c.svc.UnassignThread(ctx.Request.Context(), tenantID, envID, threadID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrThreadResolved {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "unassigned"}, nil
@@ -573,7 +589,7 @@ func (c *ConversationController) UnassignThread(ctx *gin.Context) (interface{}, 
 func (c *ConversationController) BulkAssignThreads(ctx *gin.Context) (interface{}, error) {
 	var req dto.BulkAssignRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	tenantID := uuid.Nil
@@ -597,7 +613,7 @@ func (c *ConversationController) BulkAssignThreads(ctx *gin.Context) (interface{
 
 	if err := c.svc.BulkAssignThreads(ctx.Request.Context(), tenantID, envID, req.ThreadIDs, assigneeID); err != nil {
 		// Could carry partial success info if we changed service return, but simpler for now
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "bulk_assigned"}, nil
@@ -615,7 +631,7 @@ func (c *ConversationController) BulkAssignThreads(ctx *gin.Context) (interface{
 func (c *ConversationController) ResolveThread(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	tenantID := uuid.Nil
@@ -629,7 +645,7 @@ func (c *ConversationController) ResolveThread(ctx *gin.Context) (interface{}, e
 	}
 
 	if err := c.svc.ResolveThread(ctx.Request.Context(), tenantID, envID, threadID); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "resolved"}, nil
@@ -651,7 +667,7 @@ func (c *ConversationController) ResolveThread(ctx *gin.Context) (interface{}, e
 func (c *ConversationController) GetThreadAuditTrail(ctx *gin.Context) (interface{}, error) {
 	threadID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Thread ID", err)
+		return nil, response.NewBadRequestError("Invalid Thread ID")
 	}
 
 	envID := uuid.Nil
@@ -691,7 +707,7 @@ func (c *ConversationController) GetThreadAuditTrail(ctx *gin.Context) (interfac
 
 	trail, err := c.svc.GetThreadAuditTrail(ctx.Request.Context(), envID, threadID, page, pageSize, from, to)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return trail, nil
@@ -729,7 +745,7 @@ func (c *ConversationController) GetTeamStats(ctx *gin.Context) (interface{}, er
 
 	stats, err := c.svc.GetTeamStats(ctx.Request.Context(), tenantID, envID, from, to)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.TeamStatsResponse{
@@ -775,7 +791,7 @@ func (c *ConversationController) GetMyStats(ctx *gin.Context) (interface{}, erro
 
 	stats, err := c.svc.GetAgentStats(ctx.Request.Context(), tenantID, envID, agentID, from, to)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.AgentStatsResponse{
@@ -828,7 +844,7 @@ func (c *ConversationController) GetPersonalDashboard(ctx *gin.Context) (interfa
 	// Parse Environment ID
 	envID, err := uuid.Parse(ctx.Query("environment_id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Environment ID", err)
+		return nil, response.NewBadRequestError("Invalid Environment ID")
 	}
 
 	// Parse Dates
@@ -856,7 +872,7 @@ func (c *ConversationController) GetPersonalDashboard(ctx *gin.Context) (interfa
 
 	dashboard, err := c.svc.GetPersonalDashboard(ctx.Request.Context(), agentID, req)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dashboard, nil
@@ -913,12 +929,12 @@ func (c *ConversationController) broadcastMessage(ctx context.Context, msg *enti
 func (c *ConversationController) GetTeamDashboard(ctx *gin.Context) (interface{}, error) {
 	var req dto.DashboardStatsRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	res, err := c.svc.GetTeamDashboard(ctx.Request.Context(), req)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return res, nil
@@ -939,12 +955,12 @@ func (c *ConversationController) GetTeamDashboard(ctx *gin.Context) (interface{}
 func (c *ConversationController) GetPartnerDashboard(ctx *gin.Context) (interface{}, error) {
 	var req dto.DashboardStatsRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	res, err := c.svc.GetPartnerDashboard(ctx.Request.Context(), req)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return res, nil
@@ -966,17 +982,17 @@ func (c *ConversationController) GetPartnerDashboard(ctx *gin.Context) (interfac
 func (c *ConversationController) GetAgentDashboard(ctx *gin.Context) (interface{}, error) {
 	memberID, err := uuid.Parse(ctx.Param("member_id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid Member ID", err)
+		return nil, response.NewBadRequestError("Invalid Member ID")
 	}
 
 	var req dto.DashboardStatsRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	res, err := c.svc.GetAgentDashboard(ctx.Request.Context(), memberID, req)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return res, nil

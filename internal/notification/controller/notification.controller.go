@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"net/http"
-
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/controller/dto"
 	"CONVERDA/pkg/response"
@@ -32,7 +30,7 @@ func NewNotificationController(svc service.NotificationService) *NotificationCon
 func (c *NotificationController) SendNotification(ctx *gin.Context) (interface{}, error) {
 	var req dto.SendNotificationRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	// Extract Context (Tenant/Env)
@@ -61,7 +59,7 @@ func (c *NotificationController) SendNotification(ctx *gin.Context) (interface{}
 
 	resp, err := c.svc.Send(ctx.Request.Context(), svcReq)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.NotificationResponse{

@@ -38,8 +38,11 @@ func InitMessagingModule(v1 *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Ha
 	hub := gateway.NewHub()
 	go hub.Run()
 
+	// Adapters - continued
+	notifier := adapter.NewWebSocketNotifier(hub)
+
 	// Services
-	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberReader, appReader, hub, messagingUoW)
+	msgService := impl.NewConversationService(msgRepo, threadRepo, subRepo, logRepo, memberReader, appReader, notifier, messagingUoW)
 
 	slaWorker := worker.NewSLAWorker(threadRepo, logRepo, appReader)
 	go slaWorker.Run(context.Background())

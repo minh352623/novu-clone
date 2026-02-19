@@ -167,3 +167,54 @@ func (m *stubNotificationLayoutRepository) GetDefault(ctx context.Context, envID
 		ContentHTML: "<html><body>{{.Content}} (Default)</body></html>",
 	}, nil
 }
+
+// StubNotificationTxRepository implementation
+type stubNotificationTxRepository struct {
+	notifRepo repository.NotificationRepository
+}
+
+func (r *stubNotificationTxRepository) Notifications() repository.NotificationRepository {
+	return r.notifRepo
+}
+
+func (r *stubNotificationTxRepository) Jobs() repository.NotificationJobRepository {
+	return nil
+}
+
+func (r *stubNotificationTxRepository) Groups() repository.NotificationGroupRepository {
+	return nil
+}
+
+func (r *stubNotificationTxRepository) Layouts() repository.NotificationLayoutRepository {
+	return nil
+}
+
+func (r *stubNotificationTxRepository) Templates() repository.TemplateRepository {
+	return nil
+}
+
+func (r *stubNotificationTxRepository) ProviderConfigs() repository.ProviderConfigRepository {
+	return nil
+}
+
+func (r *stubNotificationTxRepository) Webhooks() repository.WebhookRepository {
+	return nil
+}
+
+func (r *stubNotificationTxRepository) WebhookLogs() repository.WebhookLogRepository {
+	return nil
+}
+
+// StubNotificationUnitOfWork implementation
+type StubNotificationUnitOfWork struct {
+	notifRepo repository.NotificationRepository
+}
+
+func NewStubNotificationUnitOfWork(notifRepo repository.NotificationRepository) *StubNotificationUnitOfWork {
+	return &StubNotificationUnitOfWork{notifRepo: notifRepo}
+}
+
+func (u *StubNotificationUnitOfWork) Execute(ctx context.Context, fn func(tx repository.NotificationTxRepository) error) error {
+	txRepo := &stubNotificationTxRepository{notifRepo: u.notifRepo}
+	return fn(txRepo)
+}

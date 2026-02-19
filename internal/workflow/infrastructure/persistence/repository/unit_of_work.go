@@ -16,6 +16,10 @@ func (r *workflowTxRepository) Executions() repository.ExecutionRepository {
 	return NewExecutionRepository(r.tx)
 }
 
+func (r *workflowTxRepository) Workflows() repository.WorkflowRepository {
+	return NewWorkflowRepository(r.tx)
+}
+
 type workflowUnitOfWork struct {
 	db *gorm.DB
 }

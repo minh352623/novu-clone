@@ -43,7 +43,8 @@ func HelperInitService(emailProv provider.EmailProvider, pushProv provider.PushP
 	}
 
 	// 3. Application Service
-	return impl.NewNotificationService(notifRepo, tmplManager, dispatcher)
+	notifUoW := stub.NewStubNotificationUnitOfWork(notifRepo)
+	return impl.NewNotificationService(notifRepo, notifUoW, tmplManager, dispatcher)
 }
 
 func TestNotificationFlow(t *testing.T) {

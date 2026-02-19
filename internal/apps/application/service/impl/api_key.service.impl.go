@@ -17,12 +17,18 @@ import (
 type apiKeyServiceImpl struct {
 	apiKeyRepo repository.APIKeyRepository
 	envRepo    repository.EnvironmentRepository
+	uow        repository.AppsUnitOfWork
 }
 
-func NewAPIKeyService(apiKeyRepo repository.APIKeyRepository, envRepo repository.EnvironmentRepository) service.APIKeyService {
+func NewAPIKeyService(
+	apiKeyRepo repository.APIKeyRepository,
+	envRepo repository.EnvironmentRepository,
+	uow repository.AppsUnitOfWork,
+) service.APIKeyService {
 	return &apiKeyServiceImpl{
 		apiKeyRepo: apiKeyRepo,
 		envRepo:    envRepo,
+		uow:        uow,
 	}
 }
 
@@ -71,13 +77,60 @@ func (s *apiKeyServiceImpl) GenerateKey(ctx context.Context, envID uuid.UUID, na
 }
 
 func (s *apiKeyServiceImpl) RotateKey(ctx context.Context, envID uuid.UUID, name string) (string, *entity.APIKey, error) {
-	// 1. Revoke existing active keys for this environment
-	if err := s.apiKeyRepo.RevokeAllByEnvironment(ctx, envID); err != nil {
-		return "", nil, fmt.Errorf("failed to revoke old keys: %w", err)
+	var plainKey string
+	var createdKey *entity.APIKey
+
+	err := s.uow.Execute(ctx, func(tx repository.AppsTxRepository) error {
+		// 1. Revoke existing active keys for this environment
+		if err := tx.APIKeys().RevokeAllByEnvironment(ctx, envID); err != nil {
+			return fmt.Errorf("failed to revoke old keys: %w", err)
+		}
+
+		// 2. Generate new key
+		// We still need the environment for prefix, we can get it from tx or use s.envRepo if it's read-only
+		env, err := tx.Environments().GetByID(ctx, envID)
+		if err != nil {
+			return fmt.Errorf("failed to get environment: %w", err)
+		}
+		if env == nil {
+			return entity.ErrEnvironmentNotFound
+		}
+
+		prefix := "sk_test_"
+		if env.EnvironmentCode == "prod" || env.EnvironmentCode == "production" {
+			prefix = "sk_live_"
+		}
+
+		randomBytes := make([]byte, 24)
+		if _, err := rand.Read(randomBytes); err != nil {
+			return fmt.Errorf("failed to generate random bytes: %w", err)
+		}
+		secret := hex.EncodeToString(randomBytes)
+		plainKey = prefix + secret
+
+		hash := sha256.Sum256([]byte(plainKey))
+		keyHash := hex.EncodeToString(hash[:])
+
+		suffix := ""
+		if len(plainKey) > 4 {
+			suffix = plainKey[len(plainKey)-4:]
+		}
+
+		apiKey := entity.NewAPIKey(env.AppID, envID, name, prefix, suffix, keyHash, nil)
+
+		createdKey, err = tx.APIKeys().Create(ctx, apiKey)
+		if err != nil {
+			return fmt.Errorf("failed to create api key: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", nil, err
 	}
 
-	// 2. Generate new key
-	return s.GenerateKey(ctx, envID, name)
+	return plainKey, createdKey, nil
 }
 
 func (s *apiKeyServiceImpl) ValidateKey(ctx context.Context, plainKey string) (*entity.APIKey, error) {

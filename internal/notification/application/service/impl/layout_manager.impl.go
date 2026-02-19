@@ -15,10 +15,11 @@ import (
 
 type layoutManager struct {
 	repo repository.NotificationLayoutRepository
+	uow  repository.NotificationUnitOfWork
 }
 
-func NewLayoutManager(repo repository.NotificationLayoutRepository) service.LayoutManager {
-	return &layoutManager{repo: repo}
+func NewLayoutManager(repo repository.NotificationLayoutRepository, uow repository.NotificationUnitOfWork) service.LayoutManager {
+	return &layoutManager{repo: repo, uow: uow}
 }
 
 func (s *layoutManager) CreateLayout(ctx context.Context, envID uuid.UUID, name, description, contentHTML string, variables map[string]interface{}, isDefault bool) (*entity.NotificationLayout, error) {
@@ -44,50 +45,53 @@ func (s *layoutManager) CreateLayout(ctx context.Context, envID uuid.UUID, name,
 		UpdatedAt:       time.Now(),
 	}
 
-	if err := s.repo.Create(ctx, layout); err != nil {
-		return nil, fmt.Errorf("failed to create layout: %w", err)
+	if err := s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		return tx.Layouts().Create(ctx, layout)
+	}); err != nil {
+		return nil, err
 	}
 	return layout, nil
 }
 
 func (s *layoutManager) UpdateLayout(ctx context.Context, envID uuid.UUID, id uuid.UUID, name, description, contentHTML string, variables map[string]interface{}, isDefault bool) error {
-	layout, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to fetch layout %s: %w", id, err)
-	}
-	if layout == nil {
-		return domain.ErrLayoutNotFound
-	}
-	if layout.EnvironmentID != envID {
-		return domain.ErrLayoutNotInEnv
-	}
+	return s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		layout, err := tx.Layouts().GetByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch layout %s: %w", id, err)
+		}
+		if layout == nil {
+			return domain.ErrLayoutNotFound
+		}
+		if layout.EnvironmentID != envID {
+			return domain.ErrLayoutNotInEnv
+		}
 
-	layout.Name = name
-	layout.Description = description
-	layout.ContentHTML = contentHTML
-	layout.VariablesSchema = variables
-	layout.IsDefault = isDefault
-	layout.UpdatedAt = time.Now()
+		layout.Name = name
+		layout.Description = description
+		layout.ContentHTML = contentHTML
+		layout.VariablesSchema = variables
+		layout.IsDefault = isDefault
+		layout.UpdatedAt = time.Now()
 
-	if err := s.repo.Update(ctx, layout); err != nil {
-		return fmt.Errorf("failed to update layout %s: %w", id, err)
-	}
-	return nil
+		return tx.Layouts().Update(ctx, layout)
+	})
 }
 
 func (s *layoutManager) DeleteLayout(ctx context.Context, envID uuid.UUID, id uuid.UUID) error {
-	layout, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to fetch layout %s: %w", id, err)
-	}
-	if layout == nil {
-		return nil
-	}
-	if layout.EnvironmentID != envID {
-		return domain.ErrLayoutNotInEnv
-	}
+	return s.uow.Execute(ctx, func(tx repository.NotificationTxRepository) error {
+		layout, err := tx.Layouts().GetByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch layout %s: %w", id, err)
+		}
+		if layout == nil {
+			return nil
+		}
+		if layout.EnvironmentID != envID {
+			return domain.ErrLayoutNotInEnv
+		}
 
-	return s.repo.Delete(ctx, id)
+		return tx.Layouts().Delete(ctx, id)
+	})
 }
 
 func (s *layoutManager) GetLayout(ctx context.Context, envID uuid.UUID, id uuid.UUID) (*entity.NotificationLayout, error) {

@@ -7,7 +7,7 @@ import (
 // WorkflowTxRepository provides access to transaction-specific repositories
 type WorkflowTxRepository interface {
 	Executions() ExecutionRepository
-	// Add other repositories as needed within a transaction
+	Workflows() WorkflowRepository
 }
 
 // WorkflowUnitOfWork defines the interface for atomic operations in the Workflow module

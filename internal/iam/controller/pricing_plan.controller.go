@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"net/http"
-
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/controller/dto"
 	"CONVERDA/internal/iam/domain/model/entity"
@@ -39,12 +37,12 @@ func NewPricingPlanController(planService service.PricingPlanService) *PricingPl
 func (c *PricingPlanController) CreatePricingPlan(ctx *gin.Context) (interface{}, error) {
 	var req dto.CreatePricingPlanRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	plan, err := c.planService.CreatePricingPlan(ctx.Request.Context(), req.Name, req.Slug, req.MonthlyCredits, req.Price, req.Currency)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToPricingPlanResponse(plan), nil
@@ -64,15 +62,15 @@ func (c *PricingPlanController) CreatePricingPlan(ctx *gin.Context) (interface{}
 func (c *PricingPlanController) GetPricingPlan(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID format", err)
+		return nil, response.NewBadRequestError("Invalid ID format")
 	}
 
 	plan, err := c.planService.GetPricingPlan(ctx.Request.Context(), id)
 	if err != nil {
 		if err == service.ErrPlanNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, "Pricing plan not found", err)
+			return nil, response.NewNotFoundError("Pricing plan not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToPricingPlanResponse(plan), nil
@@ -95,7 +93,7 @@ func (c *PricingPlanController) GetPricingPlan(ctx *gin.Context) (interface{}, e
 func (c *PricingPlanController) ListPricingPlans(ctx *gin.Context) (interface{}, error) {
 	var params dto.PaginationParams
 	if err := ctx.ShouldBindQuery(&params); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	if params.Page <= 0 {
@@ -122,7 +120,7 @@ func (c *PricingPlanController) ListPricingPlans(ctx *gin.Context) (interface{},
 
 	plans, total, err := c.planService.ListPricingPlans(ctx.Request.Context(), filters)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.NewPaginatedResponse(dto.ToPricingPlanResponseList(plans), total, params.Page, params.PageSize), nil
@@ -143,20 +141,20 @@ func (c *PricingPlanController) ListPricingPlans(ctx *gin.Context) (interface{},
 func (c *PricingPlanController) UpdatePricingPlan(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID format", err)
+		return nil, response.NewBadRequestError("Invalid ID format")
 	}
 
 	var req dto.UpdatePricingPlanRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	plan, err := c.planService.GetPricingPlan(ctx.Request.Context(), id)
 	if err != nil {
 		if err == service.ErrPlanNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, "Pricing plan not found", err)
+			return nil, response.NewNotFoundError("Pricing plan not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	// Update fields
@@ -190,13 +188,13 @@ func (c *PricingPlanController) UpdatePricingPlan(ctx *gin.Context) (interface{}
 	}
 
 	if err := c.planService.UpdatePricingPlan(ctx.Request.Context(), updatedStruct); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	// Fetch updated
 	updatedPlan, err := c.planService.GetPricingPlan(ctx.Request.Context(), id)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToPricingPlanResponse(updatedPlan), nil
@@ -216,11 +214,11 @@ func (c *PricingPlanController) UpdatePricingPlan(ctx *gin.Context) (interface{}
 func (c *PricingPlanController) DeletePricingPlan(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID format", err)
+		return nil, response.NewBadRequestError("Invalid ID format")
 	}
 
 	if err := c.planService.DeletePricingPlan(ctx.Request.Context(), id); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return nil, nil // Wrapper handles 204
@@ -240,14 +238,14 @@ func (c *PricingPlanController) DeletePricingPlan(ctx *gin.Context) (interface{}
 func (c *PricingPlanController) SetAsDefault(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID format", err)
+		return nil, response.NewBadRequestError("Invalid ID format")
 	}
 
 	if err := c.planService.SetAsDefault(ctx.Request.Context(), id); err != nil {
 		if err == service.ErrPlanNotFound {
-			return nil, response.NewAPIError(http.StatusNotFound, "Pricing plan not found", err)
+			return nil, response.NewNotFoundError("Pricing plan not found")
 		}
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return gin.H{"message": "Pricing plan set as default successfully"}, nil

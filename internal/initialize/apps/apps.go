@@ -30,8 +30,8 @@ func InitAppsModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Han
 	// Services
 	systemEnvService := impl.NewSystemEnvironmentService(systemEnvRepo)
 	metricsService := impl.NewMetricsService(metricsRepo)
-	envService := impl.NewEnvironmentService(envRepo)
-	apiKeyService := impl.NewAPIKeyService(apiKeyRepo, envRepo)
+	envService := impl.NewEnvironmentService(envRepo, appsUoW)
+	apiKeyService := impl.NewAPIKeyService(apiKeyRepo, envRepo, appsUoW)
 
 	// AppService depends on SystemEnv and APIKey services
 	appService := impl.NewAppService(appRepo, envRepo, systemEnvService, apiKeyService, appsUoW)

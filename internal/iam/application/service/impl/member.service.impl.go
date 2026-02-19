@@ -141,7 +141,7 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 	// 2. Check if pending invitation exists
 	existingInvite, _ := s.invitationRepo.GetByEmailAndTenant(ctx, email, tenantID)
 	if existingInvite != nil {
-		return nil, fmt.Errorf("invitation already pending for this email")
+		return nil, service.ErrInvitationAlreadyPending
 	}
 
 	// 3. Create Invitation

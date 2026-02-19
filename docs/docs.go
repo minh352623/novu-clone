@@ -2230,43 +2230,6 @@ const docTemplate = `{
             }
         },
         "/notifications/layouts": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "List notification layouts",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Notification"
-                ],
-                "summary": "List Notification Layouts",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Limit",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.PaginatedResponse"
-                        }
-                    }
-                }
-            },
             "post": {
                 "security": [
                     {
@@ -2306,67 +2269,6 @@ const docTemplate = `{
             }
         },
         "/notifications/layouts/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a notification layout by ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Notification"
-                ],
-                "summary": "Get Notification Layout",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Layout ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.LayoutResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a notification layout",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Notification"
-                ],
-                "summary": "Delete Notification Layout",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Layout ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                }
-            },
             "patch": {
                 "security": [
                     {
@@ -2484,104 +2386,6 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.TemplateContentResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/notifications/templates/{id}/content/{lang}": {
-            "put": {
-                "description": "Update subject and body for a specific language",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Templates"
-                ],
-                "summary": "Update template content for a language",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Language Code",
-                        "name": "lang",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Content update",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/notifications/templates/{id}/languages": {
-            "get": {
-                "description": "Returns all language codes with content for a template",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Templates"
-                ],
-                "summary": "List available languages for a template",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse"
                         }
                     },
                     "400": {
@@ -6057,23 +5861,6 @@ const docTemplate = `{
                 }
             }
         },
-        "CONVERDA_internal_notification_controller_dto.AvailableLanguagesResponse": {
-            "type": "object",
-            "properties": {
-                "languages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "template_id": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "integer"
-                }
-            }
-        },
         "CONVERDA_internal_notification_controller_dto.CreateGroupRequest": {
             "type": "object",
             "required": [
@@ -6319,26 +6106,6 @@ const docTemplate = `{
                 "variables_schema": {
                     "type": "object",
                     "additionalProperties": true
-                }
-            }
-        },
-        "CONVERDA_internal_notification_controller_dto.UpdateTemplateContentRequest": {
-            "type": "object",
-            "properties": {
-                "body_html": {
-                    "type": "string"
-                },
-                "body_push": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "body_text": {
-                    "type": "string"
-                },
-                "subject": {
-                    "type": "string"
                 }
             }
         },

@@ -1,0 +1,56 @@
+---
+description: Rules for DTO (Data Transfer Object) files
+globs: ["internal/*/controller/dto/*.go", "internal/*/application/dto/*.go"]
+alwaysApply: false
+---
+
+# DTO Rules
+
+DTOs are simple data containers for moving data across layer boundaries.
+They live at the Interface layer edge — input from HTTP, output to HTTP.
+
+## Request DTOs
+```go
+// controller/dto/create_order_request.go
+package dto
+
+import "github.com/go-playground/validator/v10"
+
+type CreateOrderReq struct {
+    ProductID string  `json:"product_id" binding:"required,uuid"`
+    Quantity  int     `json:"quantity"   binding:"required,min=1,max=100"`
+    Note      string  `json:"note"       binding:"omitempty,max=500"`
+}
+```
+
+## Response DTOs
+```go
+// controller/dto/order_response.go
+package dto
+
+import "time"
+
+// Never include: password, refresh_token, internal IDs, PII beyond what's needed
+type OrderResp struct {
+    ID          string    `json:"id"`
+    Status      string    `json:"status"`
+    TotalAmount int64     `json:"total_amount"`
+    CreatedAt   time.Time `json:"created_at"`
+}
+
+// Paginated response wrapper
+type PaginatedResp[T any] struct {
+    Data  []T   `json:"data"`
+    Total int64 `json:"total"`
+    Page  int   `json:"page"`
+    Limit int   `json:"limit"`
+}
+```
+
+## Rules
+- Request DTOs use `binding` tags for validation (GIN)
+- Response DTOs use `json` tags only — no binding, no db tags
+- Never put `gorm:` or `db:` tags on DTOs
+- Never embed domain entities in DTOs
+- Use `omitempty` for optional response fields
+- PaginatedResp is generic — reuse for all list endpoints

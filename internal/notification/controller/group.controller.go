@@ -1,11 +1,11 @@
 package controller
 
 import (
-	"net/http"
 	"strconv"
 
 	"CONVERDA/internal/notification/application/service"
 	"CONVERDA/internal/notification/controller/dto"
+	"CONVERDA/internal/notification/domain"
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -33,7 +33,7 @@ func NewGroupController(manager service.GroupManager) *GroupController {
 func (c *GroupController) CreateGroup(ctx *gin.Context) (interface{}, error) {
 	var req dto.CreateGroupRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	envID := uuid.Nil
@@ -43,7 +43,10 @@ func (c *GroupController) CreateGroup(ctx *gin.Context) (interface{}, error) {
 
 	group, err := c.manager.CreateGroup(ctx.Request.Context(), envID, req.Name, req.Key, req.Description, req.IsDefault)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrGroupDuplicateKey {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.ToGroupResponse(group), nil
@@ -71,7 +74,7 @@ func (c *GroupController) ListGroups(ctx *gin.Context) (interface{}, error) {
 
 	groups, total, err := c.manager.ListGroups(ctx.Request.Context(), envID, limit, offset)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return dto.NewPaginatedResponse(dto.ToGroupResponseList(groups), page, limit, total), nil
@@ -89,7 +92,7 @@ func (c *GroupController) ListGroups(ctx *gin.Context) (interface{}, error) {
 func (c *GroupController) GetGroup(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID", err)
+		return nil, response.NewBadRequestError("Invalid ID")
 	}
 
 	envID := uuid.Nil
@@ -99,10 +102,10 @@ func (c *GroupController) GetGroup(ctx *gin.Context) (interface{}, error) {
 
 	group, err := c.manager.GetGroup(ctx.Request.Context(), envID, id)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 	if group == nil {
-		return nil, response.NewAPIError(http.StatusNotFound, "Group not found", nil)
+		return nil, response.NewNotFoundError("Group not found")
 	}
 
 	return dto.ToGroupResponse(group), nil
@@ -122,12 +125,12 @@ func (c *GroupController) GetGroup(ctx *gin.Context) (interface{}, error) {
 func (c *GroupController) UpdateGroup(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID", err)
+		return nil, response.NewBadRequestError("Invalid ID")
 	}
 
 	var req dto.UpdateGroupRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, err.Error(), err)
+		return nil, response.NewBadRequestError(err.Error())
 	}
 
 	envID := uuid.Nil
@@ -136,7 +139,10 @@ func (c *GroupController) UpdateGroup(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.manager.UpdateGroup(ctx.Request.Context(), envID, id, req.Name, req.Description); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		if err == domain.ErrGroupNotFound {
+			return nil, response.NewNotFoundError(err.Error())
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "updated"}, nil
@@ -154,7 +160,7 @@ func (c *GroupController) UpdateGroup(ctx *gin.Context) (interface{}, error) {
 func (c *GroupController) DeleteGroup(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid ID", err)
+		return nil, response.NewBadRequestError("Invalid ID")
 	}
 
 	envID := uuid.Nil
@@ -163,7 +169,7 @@ func (c *GroupController) DeleteGroup(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.manager.DeleteGroup(ctx.Request.Context(), envID, id); err != nil {
-		return nil, response.NewAPIError(http.StatusInternalServerError, err.Error(), err)
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "deleted"}, nil

@@ -1,10 +1,9 @@
 package controller
 
 import (
-	"net/http"
-
 	"CONVERDA/internal/workflow/application/service"
 	"CONVERDA/internal/workflow/controller/dto"
+	"CONVERDA/internal/workflow/domain"
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -33,15 +32,19 @@ func (c *WorkflowController) CreateWorkflow(ctx *gin.Context) (interface{}, erro
 	envIDStr := ctx.Query("environment_id")
 	envID, err := uuid.Parse(envIDStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid environment_id", err)
+		return nil, response.NewBadRequestError("Invalid environment_id")
 	}
 
 	var req dto.CreateWorkflowRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid request body", err)
+		return nil, response.NewBadRequestError("Invalid request body")
 	}
 
-	return c.svc.CreateWorkflow(ctx.Request.Context(), envID, req)
+	resp, err := c.svc.CreateWorkflow(ctx.Request.Context(), envID, req)
+	if err != nil {
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return resp, nil
 }
 
 // GetWorkflow godoc
@@ -54,10 +57,17 @@ func (c *WorkflowController) CreateWorkflow(ctx *gin.Context) (interface{}, erro
 func (c *WorkflowController) GetWorkflow(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid workflow ID", err)
+		return nil, response.NewBadRequestError("Invalid workflow ID")
 	}
 
-	return c.svc.GetWorkflow(ctx.Request.Context(), id)
+	wf, err := c.svc.GetWorkflow(ctx.Request.Context(), id)
+	if err != nil {
+		if err == domain.ErrWorkflowNotFound {
+			return nil, response.NewNotFoundError("Workflow not found")
+		}
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return wf, nil
 }
 
 // ListWorkflows godoc
@@ -71,10 +81,14 @@ func (c *WorkflowController) ListWorkflows(ctx *gin.Context) (interface{}, error
 	envIDStr := ctx.Query("environment_id")
 	envID, err := uuid.Parse(envIDStr)
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid environment_id", err)
+		return nil, response.NewBadRequestError("Invalid environment_id")
 	}
 
-	return c.svc.ListWorkflows(ctx.Request.Context(), envID)
+	resp, err := c.svc.ListWorkflows(ctx.Request.Context(), envID)
+	if err != nil {
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return resp, nil
 }
 
 // UpdateWorkflow godoc
@@ -89,15 +103,22 @@ func (c *WorkflowController) ListWorkflows(ctx *gin.Context) (interface{}, error
 func (c *WorkflowController) UpdateWorkflow(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid workflow ID", err)
+		return nil, response.NewBadRequestError("Invalid workflow ID")
 	}
 
 	var req dto.UpdateWorkflowRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid request body", err)
+		return nil, response.NewBadRequestError("Invalid request body")
 	}
 
-	return c.svc.UpdateWorkflow(ctx.Request.Context(), id, req)
+	resp, err := c.svc.UpdateWorkflow(ctx.Request.Context(), id, req)
+	if err != nil {
+		if err == domain.ErrWorkflowNotFound {
+			return nil, response.NewNotFoundError("Workflow not found")
+		}
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return resp, nil
 }
 
 // DeleteWorkflow godoc
@@ -109,10 +130,19 @@ func (c *WorkflowController) UpdateWorkflow(ctx *gin.Context) (interface{}, erro
 func (c *WorkflowController) DeleteWorkflow(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid workflow ID", err)
+		return nil, response.NewBadRequestError("Invalid workflow ID")
 	}
 
-	return nil, c.svc.DeleteWorkflow(ctx.Request.Context(), id)
+	if err := c.svc.DeleteWorkflow(ctx.Request.Context(), id); err != nil {
+		if err == domain.ErrWorkflowNotFound {
+			return nil, response.NewNotFoundError("Workflow not found")
+		}
+		if err == domain.ErrWorkflowActive {
+			return nil, response.NewBadRequestError("Cannot delete active workflow")
+		}
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return nil, nil
 }
 
 // ToggleWorkflow godoc
@@ -125,10 +155,17 @@ func (c *WorkflowController) DeleteWorkflow(ctx *gin.Context) (interface{}, erro
 func (c *WorkflowController) ToggleWorkflow(ctx *gin.Context) (interface{}, error) {
 	id, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid workflow ID", err)
+		return nil, response.NewBadRequestError("Invalid workflow ID")
 	}
 
-	return c.svc.ToggleWorkflow(ctx.Request.Context(), id)
+	resp, err := c.svc.ToggleWorkflow(ctx.Request.Context(), id)
+	if err != nil {
+		if err == domain.ErrWorkflowNotFound {
+			return nil, response.NewNotFoundError("Workflow not found")
+		}
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return resp, nil
 }
 
 // --- Step endpoints ---
@@ -145,15 +182,22 @@ func (c *WorkflowController) ToggleWorkflow(ctx *gin.Context) (interface{}, erro
 func (c *WorkflowController) AddStep(ctx *gin.Context) (interface{}, error) {
 	workflowID, err := uuid.Parse(ctx.Param("id"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid workflow ID", err)
+		return nil, response.NewBadRequestError("Invalid workflow ID")
 	}
 
 	var req dto.CreateStepRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid request body", err)
+		return nil, response.NewBadRequestError("Invalid request body")
 	}
 
-	return c.svc.AddStep(ctx.Request.Context(), workflowID, req)
+	resp, err := c.svc.AddStep(ctx.Request.Context(), workflowID, req)
+	if err != nil {
+		if err == domain.ErrWorkflowNotFound {
+			return nil, response.NewNotFoundError("Workflow not found")
+		}
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return resp, nil
 }
 
 // UpdateStep godoc
@@ -169,15 +213,19 @@ func (c *WorkflowController) AddStep(ctx *gin.Context) (interface{}, error) {
 func (c *WorkflowController) UpdateStep(ctx *gin.Context) (interface{}, error) {
 	stepID, err := uuid.Parse(ctx.Param("stepId"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid step ID", err)
+		return nil, response.NewBadRequestError("Invalid step ID")
 	}
 
 	var req dto.UpdateStepRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid request body", err)
+		return nil, response.NewBadRequestError("Invalid request body")
 	}
 
-	return c.svc.UpdateStep(ctx.Request.Context(), stepID, req)
+	resp, err := c.svc.UpdateStep(ctx.Request.Context(), stepID, req)
+	if err != nil {
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return resp, nil
 }
 
 // DeleteStep godoc
@@ -190,10 +238,13 @@ func (c *WorkflowController) UpdateStep(ctx *gin.Context) (interface{}, error) {
 func (c *WorkflowController) DeleteStep(ctx *gin.Context) (interface{}, error) {
 	stepID, err := uuid.Parse(ctx.Param("stepId"))
 	if err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid step ID", err)
+		return nil, response.NewBadRequestError("Invalid step ID")
 	}
 
-	return nil, c.svc.DeleteStep(ctx.Request.Context(), stepID)
+	if err := c.svc.DeleteStep(ctx.Request.Context(), stepID); err != nil {
+		return nil, response.NewInternalServerError(err.Error())
+	}
+	return nil, nil
 }
 
 // --- Trigger endpoint ---
@@ -209,12 +260,15 @@ func (c *WorkflowController) DeleteStep(ctx *gin.Context) (interface{}, error) {
 func (c *WorkflowController) TriggerWorkflow(ctx *gin.Context) (interface{}, error) {
 	var req dto.TriggerWorkflowRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return nil, response.NewAPIError(http.StatusBadRequest, "Invalid request body", err)
+		return nil, response.NewBadRequestError("Invalid request body")
 	}
 
 	if err := c.triggerSvc.Trigger(ctx.Request.Context(),
 		req.EnvironmentID, req.TriggerIdentifier, req.SubscriberKey, req.Payload); err != nil {
-		return nil, response.NewAPIError(http.StatusUnprocessableEntity, "Failed to trigger workflow", err)
+		if err == domain.ErrWorkflowNotFound {
+			return nil, response.NewNotFoundError("Workflow not found")
+		}
+		return nil, response.NewInternalServerError(err.Error())
 	}
 
 	return map[string]string{"status": "triggered"}, nil
