@@ -58,7 +58,7 @@ func (s *conversationServiceImpl) ReceiveMessage(ctx context.Context, tenantID, 
 		// 1. Find or Create Subscriber
 		sub, err := tx.Subscribers().GetByKey(ctx, envID, subKey)
 		if err != nil {
-			sub = entity.NewSubscriber(envID, subKey)
+			sub = entity.NewSubscriber(tenantID, envID, subKey)
 			sub, err = tx.Subscribers().Create(ctx, sub)
 			if err != nil {
 				return fmt.Errorf("failed to create subscriber: %w", err)
@@ -84,7 +84,7 @@ func (s *conversationServiceImpl) ReceiveMessage(ctx context.Context, tenantID, 
 			if channel == "" {
 				channel = "support"
 			}
-			thread = entity.NewThread(envID, "support", channel)
+			thread = entity.NewThread(tenantID, envID, "support", channel)
 			thread, err = tx.Threads().Create(ctx, thread)
 			if err != nil {
 				return fmt.Errorf("failed to create support thread: %w", err)
@@ -510,7 +510,7 @@ func (s *conversationServiceImpl) GetMessagesByCursor(ctx context.Context, envID
 	return msgs, nextCursorStr, prevCursorStr, nil
 }
 
-func (s *conversationServiceImpl) GetOrCreateDirectThread(ctx context.Context, envID, memberID uuid.UUID, targetID uuid.UUID, targetType string) (*entity.Thread, error) {
+func (s *conversationServiceImpl) GetOrCreateDirectThread(ctx context.Context, tenantID, envID, memberID uuid.UUID, targetID uuid.UUID, targetType string) (*entity.Thread, error) {
 	var thread *entity.Thread
 
 	// 1. Generate ReferenceHash for Direct Chat (Sorted IDs)
@@ -523,7 +523,7 @@ func (s *conversationServiceImpl) GetOrCreateDirectThread(ctx context.Context, e
 	err := s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
 		var err error
 		// 2. Try to create new thread (Atomic with unique constraint)
-		thread = entity.NewThread(envID, entity.ThreadTypeDirect, "internal")
+		thread = entity.NewThread(tenantID, envID, entity.ThreadTypeDirect, "internal")
 		thread.ReferenceHash = &refHash
 		thread, err = tx.Threads().Create(ctx, thread)
 		if err != nil {
@@ -557,12 +557,12 @@ func (s *conversationServiceImpl) GetOrCreateDirectThread(ctx context.Context, e
 	return thread, nil
 }
 
-func (s *conversationServiceImpl) CreateGroupThread(ctx context.Context, envID uuid.UUID, name string, inputParticipants []*entity.ThreadParticipant) (*entity.Thread, error) {
+func (s *conversationServiceImpl) CreateGroupThread(ctx context.Context, tenantID, envID uuid.UUID, name string, inputParticipants []*entity.ThreadParticipant) (*entity.Thread, error) {
 	var thread *entity.Thread
 
 	err := s.uow.Execute(ctx, func(tx domainRepo.MessagingTxRepository) error {
 		var err error
-		thread = entity.NewThread(envID, entity.ThreadTypeGroup, "internal")
+		thread = entity.NewThread(tenantID, envID, entity.ThreadTypeGroup, "internal")
 		// Metadata can store name if needed
 		meta := map[string]interface{}{
 			"name": name,

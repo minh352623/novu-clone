@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -29,6 +30,21 @@ func RateLimitMiddleware(envService service.EnvironmentService, limiter ratelimi
 		if !ok {
 			ctx.Next()
 			return
+		}
+
+		// Tenant-level RPM from plan (set by auth middleware from JWT claims)
+		if planVal, exists := ctx.Get(ContextKeyPlan); exists {
+			if planSlug, ok := planVal.(string); ok && planSlug != "" {
+				// Use tenant-scoped key for plan-level rate limiting
+				if tenantVal, exists := ctx.Get(ContextKeyTenantIDFromJWT); exists {
+					if tenantID, ok := tenantVal.(uuid.UUID); ok {
+						tenantRPMKey := fmt.Sprintf("tenant_rpm:%s", tenantID.String())
+						// Plan-level RPM is enforced if set (checked by caller or looked up)
+						// We use a conservative default; actual enforcement comes from env config below
+						ctx.Set("tenant_rate_key", tenantRPMKey)
+					}
+				}
+			}
 		}
 
 		// Look up environment config
@@ -77,4 +93,54 @@ func RateLimitMiddleware(envService service.EnvironmentService, limiter ratelimi
 
 		ctx.Next()
 	}
+}
+
+// TenantRateLimitMiddleware enforces tenant-level rate limits based on the pricing plan.
+// Must be placed AFTER AuthMiddleware + TenantMembershipMiddleware.
+func TenantRateLimitMiddleware(limiter ratelimit.RateLimiter, planRPMProvider TenantPlanRPMProvider) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		tenantIDVal, exists := ctx.Get(ContextKeyTenantIDFromJWT)
+		if !exists {
+			ctx.Next()
+			return
+		}
+
+		tenantID, ok := tenantIDVal.(uuid.UUID)
+		if !ok {
+			ctx.Next()
+			return
+		}
+
+		// Get plan RPM for this tenant
+		rpm := planRPMProvider.GetTenantPlanRPM(ctx.Request.Context(), tenantID)
+		if rpm <= 0 {
+			ctx.Next()
+			return
+		}
+
+		tenantKey := fmt.Sprintf("tenant_rpm:%s", tenantID.String())
+		if !limiter.Allow(tenantKey, rpm, 1*time.Minute) {
+			remaining := limiter.Remaining(tenantKey, rpm, 1*time.Minute)
+			ctx.Header("X-Tenant-RateLimit-Limit", strconv.Itoa(rpm))
+			ctx.Header("X-Tenant-RateLimit-Remaining", strconv.Itoa(remaining))
+			ctx.Header("Retry-After", "60")
+			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, response.NewAPIError(
+				http.StatusTooManyRequests,
+				"Tenant rate limit exceeded",
+				fmt.Sprintf("Tenant RPM limit of %d exceeded", rpm),
+			))
+			return
+		}
+
+		remaining := limiter.Remaining(tenantKey, rpm, 1*time.Minute)
+		ctx.Header("X-Tenant-RateLimit-Limit", strconv.Itoa(rpm))
+		ctx.Header("X-Tenant-RateLimit-Remaining", strconv.Itoa(remaining))
+
+		ctx.Next()
+	}
+}
+
+// TenantPlanRPMProvider looks up the rate limit RPM for a tenant's plan.
+type TenantPlanRPMProvider interface {
+	GetTenantPlanRPM(ctx context.Context, tenantID uuid.UUID) int
 }

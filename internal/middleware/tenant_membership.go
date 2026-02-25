@@ -22,6 +22,8 @@ type MembershipChecker interface {
 	GetMemberByTenantAndUser(ctx context.Context, tenantID, userID uuid.UUID) (memberID uuid.UUID, roleID *uuid.UUID, err error)
 	// GetMemberByTenantUserAndApp checks membership for a specific app (or tenant-wide if appID is nil).
 	GetMemberByTenantUserAndApp(ctx context.Context, tenantID, userID uuid.UUID, appID *uuid.UUID) (memberID uuid.UUID, roleID *uuid.UUID, err error)
+	// GetTenantStatus returns the current lifecycle status of a tenant (active, suspended, pending, deactivated)
+	GetTenantStatus(ctx context.Context, tenantID uuid.UUID) (string, error)
 }
 
 // TenantMembershipMiddleware checks if the authenticated user is a member of the tenant
@@ -116,6 +118,42 @@ func TenantMembershipMiddleware(checker MembershipChecker) gin.HandlerFunc {
 				return
 			}
 			appID = &id
+		}
+
+		// Validate tenant lifecycle status before checking membership
+		status, err := checker.GetTenantStatus(ctx.Request.Context(), tenantID)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, response.NewAPIError(
+				http.StatusNotFound,
+				"Not Found",
+				"Tenant not found",
+			))
+			return
+		}
+		switch status {
+		case "active":
+			// OK, continue
+		case "suspended":
+			ctx.AbortWithStatusJSON(http.StatusPaymentRequired, response.NewAPIError(
+				http.StatusPaymentRequired,
+				"Payment Required",
+				"Tenant is suspended. Please resolve billing issues.",
+			))
+			return
+		case "pending":
+			ctx.AbortWithStatusJSON(http.StatusForbidden, response.NewAPIError(
+				http.StatusForbidden,
+				"Forbidden",
+				"Tenant is pending approval",
+			))
+			return
+		default:
+			ctx.AbortWithStatusJSON(http.StatusForbidden, response.NewAPIError(
+				http.StatusForbidden,
+				"Forbidden",
+				"Tenant is unavailable",
+			))
+			return
 		}
 
 		// Check membership with optional appID

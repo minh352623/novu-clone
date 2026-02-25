@@ -1,6 +1,9 @@
 package controller
 
 import (
+	"errors"
+
+	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/controller/dto"
 	"CONVERDA/internal/iam/domain/repository"
@@ -68,10 +71,11 @@ func (c *RoleController) GetRole(ctx *gin.Context) (interface{}, error) {
 
 	role, err := c.roleService.GetRole(ctx.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrRoleNotFound {
+		if errors.Is(err, service.ErrRoleNotFound) {
 			return nil, response.NewNotFoundError("Role not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("RoleController.GetRole: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToRoleResponse(role), nil
@@ -89,25 +93,34 @@ func (c *RoleController) GetRole(ctx *gin.Context) (interface{}, error) {
 // @Security BearerAuth
 // @Router /roles [get]
 func (c *RoleController) ListRoles(ctx *gin.Context) (interface{}, error) {
-	page := 1
-	pageSize := 20
-	// TODO: parse page/pageSize
+	var params dto.PaginationParams
+	if err := ctx.ShouldBindQuery(&params); err != nil {
+		return nil, response.NewBadRequestError(err.Error())
+	}
+	if params.Page <= 0 {
+		params.Page = 1
+	}
+	if params.PageSize <= 0 {
+		params.PageSize = 20
+	}
 
 	filters := repository.RoleFilters{
-		Limit:  pageSize,
-		Offset: (page - 1) * pageSize,
+		Limit:  params.PageSize,
+		Offset: (params.Page - 1) * params.PageSize,
+		Search: params.Search,
 	}
 
 	roles, total, err := c.roleService.ListRoles(ctx.Request.Context(), filters)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("RoleController.ListRoles: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.NewPaginatedResponse(
 		dto.ToRoleResponseList(roles),
 		total,
-		page,
-		pageSize,
+		params.Page,
+		params.PageSize,
 	), nil
 }
 
@@ -139,10 +152,11 @@ func (c *RoleController) UpdateRole(ctx *gin.Context) (interface{}, error) {
 	// Get existing role (verification)
 	role, err := c.roleService.GetRole(ctx.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrRoleNotFound {
+		if errors.Is(err, service.ErrRoleNotFound) {
 			return nil, response.NewNotFoundError("Role not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("RoleController.UpdateRole: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	// Update fields
@@ -178,7 +192,8 @@ func (c *RoleController) DeleteRole(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.roleService.DeleteRole(ctx.Request.Context(), id); err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("RoleController.DeleteRole: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return nil, nil // 204 No Content handled by wrapper if returning nil data? Wrapper uses 200 usually.
@@ -253,7 +268,8 @@ func (c *RoleController) AssignRole(ctx *gin.Context) (interface{}, error) {
 	// Let's Assume req.MemberID is passed.
 
 	if err := c.memberService.AssignRole(ctx.Request.Context(), req.UserID, roleID); err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("RoleController.AssignRole: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return gin.H{"message": "Role assigned successfully"}, nil
@@ -284,7 +300,8 @@ func (c *RoleController) RevokeRole(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.memberService.RevokeRole(ctx.Request.Context(), req.UserID); err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("RoleController.RevokeRole: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return gin.H{"message": "Role revoked successfully"}, nil

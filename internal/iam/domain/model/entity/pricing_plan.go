@@ -9,17 +9,22 @@ import (
 
 // PricingPlan represents a subscription plan for tenants
 type PricingPlan struct {
-	ID             uuid.UUID `json:"id"`
-	Name           string    `json:"name"`
-	Slug           string    `json:"slug"`
-	MonthlyCredits int64     `json:"monthly_credits"`
-	Price          float64   `json:"price"`
-	Currency       string    `json:"currency"`
-	Description    *string   `json:"description,omitempty"`
-	IsActive       bool      `json:"is_active"`
-	IsDefault      bool      `json:"is_default"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID                  uuid.UUID `json:"id"`
+	Name                string    `json:"name"`
+	Slug                string    `json:"slug"`
+	MonthlyCredits      int64     `json:"monthly_credits"`
+	Price               float64   `json:"price"`
+	Currency            string    `json:"currency"`
+	Description         *string   `json:"description,omitempty"`
+	IsActive            bool      `json:"is_active"`
+	IsDefault           bool      `json:"is_default"`
+	MaxApps             int       `json:"max_apps"`               // 0 = unlimited
+	MaxMembers          int       `json:"max_members"`            // 0 = unlimited
+	MaxWorkflows        int       `json:"max_workflows"`          // 0 = unlimited
+	MaxMessagesPerMonth int64     `json:"max_messages_per_month"` // 0 = unlimited
+	RateLimitRPM        int       `json:"rate_limit_rpm"`         // tenant-level RPM, 0 = no override
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // PricingPlan errors
@@ -27,6 +32,7 @@ var (
 	ErrPlanNameRequired = errors.New("plan name is required")
 	ErrPlanSlugRequired = errors.New("plan slug is required")
 	ErrPlanNotActive    = errors.New("pricing plan is not active")
+	ErrPlanLimitReached = errors.New("plan limit reached")
 )
 
 // NewPricingPlan creates a new pricing plan
@@ -51,6 +57,15 @@ func NewPricingPlan(name, slug string, monthlyCredits int64, price float64) (*Pr
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}, nil
+}
+
+// IsWithinLimit checks if the current count is within the plan limit.
+// A limit of 0 means unlimited.
+func (p *PricingPlan) IsWithinLimit(limitValue int, currentCount int) bool {
+	if limitValue <= 0 {
+		return true // unlimited
+	}
+	return currentCount < limitValue
 }
 
 // Validate validates the pricing plan

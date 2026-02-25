@@ -17,12 +17,12 @@ func NewTokenService() service.TokenService {
 	return &tokenServiceImpl{}
 }
 
-func (s *tokenServiceImpl) GenerateAccessToken(ctx context.Context, userID uuid.UUID, email string) (string, int64, error) {
-	return jwtPkg.GenerateAccessToken(userID.String(), email)
+func (s *tokenServiceImpl) GenerateAccessToken(ctx context.Context, userID uuid.UUID, email string, tc *jwtPkg.TenantClaims) (string, int64, error) {
+	return jwtPkg.GenerateAccessToken(userID.String(), email, tc)
 }
 
-func (s *tokenServiceImpl) GenerateRefreshToken(ctx context.Context, userID uuid.UUID, email string) (string, time.Time, error) {
-	return jwtPkg.GenerateRefreshToken(userID.String(), email)
+func (s *tokenServiceImpl) GenerateRefreshToken(ctx context.Context, userID uuid.UUID, email string, tc *jwtPkg.TenantClaims) (string, time.Time, error) {
+	return jwtPkg.GenerateRefreshToken(userID.String(), email, tc)
 }
 
 func (s *tokenServiceImpl) ValidateRefreshToken(ctx context.Context, tokenString string) (uuid.UUID, string, error) {

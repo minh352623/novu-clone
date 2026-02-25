@@ -169,6 +169,11 @@ func (c *ConversationController) CreateDirectChat(ctx *gin.Context) (interface{}
 		return nil, response.NewBadRequestError(err.Error())
 	}
 
+	tenantID := uuid.Nil
+	if tID, ok := ctx.Get("tenant_id"); ok {
+		tenantID = tID.(uuid.UUID)
+	}
+
 	envID := uuid.Nil
 	if eID, ok := ctx.Get("environment_id"); ok {
 		envID = eID.(uuid.UUID)
@@ -179,7 +184,7 @@ func (c *ConversationController) CreateDirectChat(ctx *gin.Context) (interface{}
 		agentID = uID.(uuid.UUID)
 	}
 
-	thread, err := c.svc.GetOrCreateDirectThread(ctx.Request.Context(), envID, agentID, req.Target.ID, req.Target.Type)
+	thread, err := c.svc.GetOrCreateDirectThread(ctx.Request.Context(), tenantID, envID, agentID, req.Target.ID, req.Target.Type)
 	if err != nil {
 		return nil, response.NewInternalServerError(err.Error())
 	}
@@ -235,7 +240,12 @@ func (c *ConversationController) CreateGroupChat(ctx *gin.Context) (interface{},
 		})
 	}
 
-	thread, err := c.svc.CreateGroupThread(ctx.Request.Context(), envID, req.Name, participants)
+	tenantID := uuid.Nil
+	if tID, ok := ctx.Get("tenant_id"); ok {
+		tenantID = tID.(uuid.UUID)
+	}
+
+	thread, err := c.svc.CreateGroupThread(ctx.Request.Context(), tenantID, envID, req.Name, participants)
 	if err != nil {
 		return nil, response.NewInternalServerError(err.Error())
 	}

@@ -26,6 +26,7 @@ func InitAppsModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Han
 
 	// Repositories (IAM - for membership checking)
 	memberRepo := iamRepository.NewTenantMemberRepository(db)
+	tenantRepo := iamRepository.NewTenantRepository(db)
 
 	// Services
 	systemEnvService := impl.NewSystemEnvironmentService(systemEnvRepo)
@@ -40,7 +41,7 @@ func InitAppsModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Han
 	providerService := impl.NewProviderService(providerRepo)
 
 	// Middleware Adapters
-	membershipChecker := middleware.NewMembershipCheckerAdapter(memberRepo)
+	membershipChecker := middleware.NewMembershipCheckerAdapter(memberRepo, tenantRepo)
 	tenantMembershipMiddleware := middleware.TenantMembershipMiddleware(membershipChecker)
 
 	// Controllers

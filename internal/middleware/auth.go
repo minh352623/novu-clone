@@ -13,9 +13,17 @@ import (
 
 const (
 	// ContextKeyUserID is the key for user ID in context
-	ContextKeyUserID = "user_id" // Consistent with what controller uses
+	ContextKeyUserID = "user_id"
 	// ContextKeyEmail is the key for email in context
 	ContextKeyEmail = "email"
+	// ContextKeyTenantIDFromJWT is the tenant ID extracted from JWT claims
+	ContextKeyTenantIDFromJWT = "jwt_tenant_id"
+	// ContextKeyTenantSlug is the tenant slug from JWT claims
+	ContextKeyTenantSlug = "tenant_slug"
+	// ContextKeyRoles is the roles from JWT claims
+	ContextKeyRoles = "roles"
+	// ContextKeyPlan is the plan from JWT claims
+	ContextKeyPlan = "plan"
 )
 
 // AuthMiddleware is the JWT authentication middleware
@@ -82,6 +90,22 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		ctx.Set(ContextKeyUserID, uid)
 		ctx.Set(ContextKeyEmail, claims.Email)
+
+		// Extract tenant context from JWT claims (if present)
+		if claims.TenantID != "" {
+			if tenantUUID, err := uuid.Parse(claims.TenantID); err == nil {
+				ctx.Set(ContextKeyTenantIDFromJWT, tenantUUID)
+			}
+		}
+		if claims.TenantSlug != "" {
+			ctx.Set(ContextKeyTenantSlug, claims.TenantSlug)
+		}
+		if len(claims.Roles) > 0 {
+			ctx.Set(ContextKeyRoles, claims.Roles)
+		}
+		if claims.Plan != "" {
+			ctx.Set(ContextKeyPlan, claims.Plan)
+		}
 
 		ctx.Next()
 	}

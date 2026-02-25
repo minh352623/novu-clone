@@ -34,6 +34,7 @@ const (
 // Workflow represents an automation workflow scoped to an environment.
 type Workflow struct {
 	ID                uuid.UUID
+	TenantID          uuid.UUID
 	EnvironmentID     uuid.UUID
 	Name              string
 	TriggerIdentifier string

@@ -3,8 +3,10 @@ package initialize
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"CONVERDA/global"
+	iamRepo "CONVERDA/internal/iam/infrastructure/persistence/repository"
 	initializeApps "CONVERDA/internal/initialize/apps"
 	initializeHealth "CONVERDA/internal/initialize/health"
 	initializeIAM "CONVERDA/internal/initialize/iam"
@@ -14,6 +16,8 @@ import (
 	initializeWorkflow "CONVERDA/internal/initialize/workflow"
 	"CONVERDA/internal/middleware"
 	r2Http "CONVERDA/internal/r2/controller/http"
+	"CONVERDA/pkg/auditlog"
+	"CONVERDA/pkg/ratelimit"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -33,9 +37,22 @@ func InitRouter(db *sql.DB) *gin.Engine {
 		gin.SetMode(gin.ReleaseMode)
 		r = gin.New()
 	}
+
+	// -- Multi-tenant infrastructure --
+	auditLogRepo := iamRepo.NewAuditLogRepository(global.GormDB)
+	auditLogger := auditlog.NewLogger(auditLogRepo)
+	tenantLimiter := ratelimit.NewMemoryRateLimiter(5 * time.Minute)
+	tenantRPMProvider := middleware.NewTenantPlanRPMAdapter(global.GormDB)
+
 	// API v1/2025 group
 	v1 := r.Group("/v1/api")
 	{
+		// Global middleware: audit logging for all mutating requests
+		v1.Use(middleware.AuditMiddleware(auditLogger))
+
+		// Tenant-level rate limiting (after auth sets tenant context)
+		v1.Use(middleware.TenantRateLimitMiddleware(tenantLimiter, tenantRPMProvider))
+
 		// R2 module routes
 		r2Handler := initializeR2.InitR2()
 		if r2Handler != nil {

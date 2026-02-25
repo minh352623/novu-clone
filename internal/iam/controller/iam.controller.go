@@ -1,14 +1,32 @@
 package controller
 
 import (
+	"errors"
+
+	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/controller/dto"
+	"CONVERDA/internal/iam/domain/model/entity"
 	"CONVERDA/internal/iam/domain/repository"
 	"CONVERDA/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// getUserIDFromCtx safely extracts the user ID from the gin context.
+// It uses comma-ok pattern to prevent panics from invalid type assertion.
+func getUserIDFromCtx(ctx *gin.Context) (uuid.UUID, error) {
+	val, exists := ctx.Get("user_id")
+	if !exists {
+		return uuid.Nil, response.NewUnauthorizedError("Unauthorized")
+	}
+	uid, ok := val.(uuid.UUID)
+	if !ok {
+		return uuid.Nil, response.NewUnauthorizedError("Invalid user context")
+	}
+	return uid, nil
+}
 
 // AuthController handles authentication endpoints
 type AuthController struct {
@@ -43,14 +61,18 @@ func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 
 	user, err := c.authService.Register(ctx.Request.Context(), req.Email, req.Password, req.FullName)
 	if err != nil {
-		if err == service.ErrUserAlreadyExists {
+		if errors.Is(err, service.ErrUserAlreadyExists) {
 			return nil, response.NewConflictError(err.Error())
 		}
-		return nil, response.NewBadRequestError(err.Error())
+		if errors.Is(err, entity.ErrUserEmailRequired) || errors.Is(err, entity.ErrUserPasswordRequired) || errors.Is(err, entity.ErrUserPasswordTooShort) {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		global.Logger.Error("AuthController.Register: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	// Generate tokens for auto-login
-	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email)
+	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email, nil)
 	if err != nil {
 		// Log error but assume registration success
 		// Ideally we should rollback or return warning, but for now just return user
@@ -58,7 +80,7 @@ func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 			User: dto.ToUserResponse(user),
 		}, nil
 	}
-	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email)
+	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email, nil)
 	if err != nil {
 		return nil, response.NewInternalServerError("Failed to generate refresh token")
 	}
@@ -92,12 +114,12 @@ func (c *AuthController) Login(ctx *gin.Context) (interface{}, error) {
 	}
 
 	// Generate JWT tokens
-	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email)
+	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), user.ID, user.Email, nil)
 	if err != nil {
 		return nil, response.NewInternalServerError("Failed to generate token")
 	}
 
-	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email)
+	refreshToken, _, err := c.tokenService.GenerateRefreshToken(ctx.Request.Context(), user.ID, user.Email, nil)
 	if err != nil {
 		return nil, response.NewInternalServerError("Failed to generate refresh token")
 	}
@@ -127,18 +149,21 @@ func (c *AuthController) ChangePassword(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewBadRequestError(err.Error())
 	}
 
-	// Get user ID from context (set by auth middleware)
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		return nil, response.NewUnauthorizedError("Unauthorized")
+	userID, err := getUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	err := c.authService.ChangePassword(ctx.Request.Context(), userID.(uuid.UUID), req.OldPassword, req.NewPassword)
+	err = c.authService.ChangePassword(ctx.Request.Context(), userID, req.OldPassword, req.NewPassword)
 	if err != nil {
-		if err == service.ErrInvalidCredentials {
+		if errors.Is(err, service.ErrInvalidCredentials) {
 			return nil, response.NewBadRequestError("Current password is incorrect")
 		}
-		return nil, response.NewBadRequestError(err.Error())
+		if errors.Is(err, service.ErrUserNotFound) {
+			return nil, response.NewNotFoundError("User not found")
+		}
+		global.Logger.Error("AuthController.ChangePassword: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return gin.H{"message": "Password changed successfully"}, nil
@@ -166,7 +191,7 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) (interface{}, error) {
 	}
 
 	// Generate new access token
-	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), userID, email)
+	accessToken, _, err := c.tokenService.GenerateAccessToken(ctx.Request.Context(), userID, email, nil)
 	if err != nil {
 		return nil, response.NewInternalServerError("Failed to generate token")
 	}
@@ -195,17 +220,18 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) (interface{}, error) {
 // @Security BearerAuth
 // @Router /users/me [get]
 func (c *AuthController) Me(ctx *gin.Context) (interface{}, error) {
-	userID, exists := ctx.Get("user_id") // Middleware ensures UUID type now
-	if !exists {
-		return nil, response.NewUnauthorizedError("Unauthorized")
+	userID, err := getUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	user, err := c.authService.GetUser(ctx.Request.Context(), userID.(uuid.UUID))
+	user, err := c.authService.GetUser(ctx.Request.Context(), userID)
 	if err != nil {
-		if err == service.ErrUserNotFound {
+		if errors.Is(err, service.ErrUserNotFound) {
 			return nil, response.NewNotFoundError("User not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("AuthController.Me: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToUserResponse(user), nil
@@ -243,18 +269,18 @@ func (c *TenantController) CreateTenant(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewBadRequestError(err.Error())
 	}
 
-	// Get user ID from context
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		return nil, response.NewUnauthorizedError("Unauthorized")
+	userID, err := getUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	tenant, err := c.tenantService.CreateTenant(ctx.Request.Context(), req.Name, req.Slug, userID.(uuid.UUID))
+	tenant, err := c.tenantService.CreateTenant(ctx.Request.Context(), req.Name, req.Slug, userID)
 	if err != nil {
-		if err == service.ErrTenantSlugExists {
+		if errors.Is(err, service.ErrTenantSlugExists) {
 			return nil, response.NewConflictError(err.Error())
 		}
-		return nil, response.NewBadRequestError(err.Error())
+		global.Logger.Error("TenantController.CreateTenant: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantResponse(tenant), nil
@@ -279,10 +305,11 @@ func (c *TenantController) GetTenant(ctx *gin.Context) (interface{}, error) {
 
 	tenant, err := c.tenantService.GetTenant(ctx.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrTenantNotFound {
+		if errors.Is(err, service.ErrTenantNotFound) {
 			return nil, response.NewNotFoundError("Tenant not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("TenantController.GetTenant: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantResponse(tenant), nil
@@ -307,7 +334,7 @@ func (c *TenantController) UpdateTenant(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewBadRequestError("Invalid tenant ID")
 	}
 
-	var req dto.CreateTenantRequest // Using Create DTO for simplicity, or Create UpdateDTO
+	var req dto.UpdateTenantRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		return nil, response.NewBadRequestError(err.Error())
 	}
@@ -315,23 +342,25 @@ func (c *TenantController) UpdateTenant(ctx *gin.Context) (interface{}, error) {
 	// 1. Get existing tenant to verify existence
 	tenant, err := c.tenantService.GetTenant(ctx.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrTenantNotFound {
+		if errors.Is(err, service.ErrTenantNotFound) {
 			return nil, response.NewNotFoundError("Tenant not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("TenantController.UpdateTenant: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
-	// 2. Update fields
-	tenant.Name = req.Name
-	tenant.Slug = req.Slug
+	// 2. Partial update fields
+	if req.Name != nil {
+		tenant.Name = *req.Name
+	}
 
 	// 3. Save
-	// Service should handle validation (slug uniqueness)
 	if err := c.tenantService.UpdateTenant(ctx.Request.Context(), tenant); err != nil {
-		if err == service.ErrTenantSlugExists {
+		if errors.Is(err, service.ErrTenantSlugExists) {
 			return nil, response.NewConflictError(err.Error())
 		}
-		return nil, response.NewBadRequestError(err.Error())
+		global.Logger.Error("TenantController.UpdateTenant: update failed", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantResponse(tenant), nil
@@ -355,10 +384,11 @@ func (c *TenantController) DeleteTenant(ctx *gin.Context) (interface{}, error) {
 	}
 
 	if err := c.tenantService.DeleteTenant(ctx.Request.Context(), id); err != nil {
-		if err == service.ErrTenantNotFound {
+		if errors.Is(err, service.ErrTenantNotFound) {
 			return nil, response.NewNotFoundError("Tenant not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("TenantController.DeleteTenant: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return gin.H{"message": "Tenant deleted successfully"}, nil
@@ -376,24 +406,34 @@ func (c *TenantController) DeleteTenant(ctx *gin.Context) (interface{}, error) {
 // @Security BearerAuth
 // @Router /tenants [get]
 func (c *TenantController) ListTenants(ctx *gin.Context) (interface{}, error) {
-	page := 1
-	pageSize := 20
+	var params dto.PaginationParams
+	if err := ctx.ShouldBindQuery(&params); err != nil {
+		return nil, response.NewBadRequestError(err.Error())
+	}
+	if params.Page <= 0 {
+		params.Page = 1
+	}
+	if params.PageSize <= 0 {
+		params.PageSize = 20
+	}
 
 	filters := repository.TenantFilters{
-		Limit:  pageSize,
-		Offset: (page - 1) * pageSize,
+		Limit:  params.PageSize,
+		Offset: (params.Page - 1) * params.PageSize,
+		Search: params.Search,
 	}
 
 	tenants, total, err := c.tenantService.ListTenants(ctx.Request.Context(), filters)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("TenantController.ListTenants: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.NewPaginatedResponse(
 		dto.ToTenantResponseList(tenants),
 		total,
-		page,
-		pageSize,
+		params.Page,
+		params.PageSize,
 	), nil
 }
 
@@ -406,14 +446,15 @@ func (c *TenantController) ListTenants(ctx *gin.Context) (interface{}, error) {
 // @Security BearerAuth
 // @Router /tenants/me [get]
 func (c *TenantController) GetMyTenants(ctx *gin.Context) (interface{}, error) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		return nil, response.NewUnauthorizedError("Unauthorized")
+	userID, err := getUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	tenants, err := c.tenantService.GetUserTenants(ctx.Request.Context(), userID.(uuid.UUID))
+	tenants, err := c.tenantService.GetUserTenants(ctx.Request.Context(), userID)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("TenantController.GetMyTenants: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantResponseList(tenants), nil
@@ -437,7 +478,8 @@ func (c *TenantController) GetMembers(ctx *gin.Context) (interface{}, error) {
 
 	members, err := c.memberService.GetMembers(ctx.Request.Context(), tenantID)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("TenantController.GetMembers: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantMemberResponseList(members), nil
@@ -470,7 +512,11 @@ func (c *TenantController) AddMember(ctx *gin.Context) (interface{}, error) {
 
 	member, err := c.memberService.AddMember(ctx.Request.Context(), tenantID, req.UserID, req.RoleID, req.AppID)
 	if err != nil {
-		return nil, response.NewBadRequestError(err.Error())
+		if errors.Is(err, entity.ErrMemberAlreadyExists) {
+			return nil, response.NewConflictError(err.Error())
+		}
+		global.Logger.Error("TenantController.AddMember: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantMemberResponse(member), nil
@@ -501,17 +547,21 @@ func (c *TenantController) InviteMember(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewBadRequestError(err.Error())
 	}
 
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		return nil, response.NewUnauthorizedError("Unauthorized")
+	userID, err := getUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	invite, err := c.memberService.InviteMember(ctx.Request.Context(), tenantID, req.Email, req.RoleID, req.AppID, userID.(uuid.UUID))
+	invite, err := c.memberService.InviteMember(ctx.Request.Context(), tenantID, req.Email, req.RoleID, req.AppID, userID)
 	if err != nil {
-		if err == service.ErrUnauthorized {
+		if errors.Is(err, service.ErrUnauthorized) {
 			return nil, response.NewForbiddenError("Insufficient permissions")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		if errors.Is(err, service.ErrInvitationAlreadyPending) {
+			return nil, response.NewConflictError(err.Error())
+		}
+		global.Logger.Error("TenantController.InviteMember: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantInvitationResponse(invite), nil
@@ -534,15 +584,21 @@ func (c *TenantController) AcceptInvitation(ctx *gin.Context) (interface{}, erro
 		return nil, response.NewBadRequestError(err.Error())
 	}
 
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		return nil, response.NewUnauthorizedError("Unauthorized")
+	userID, err := getUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	member, err := c.memberService.AcceptInvitation(ctx.Request.Context(), req.Token, userID.(uuid.UUID))
+	member, err := c.memberService.AcceptInvitation(ctx.Request.Context(), req.Token, userID)
 	if err != nil {
-		// Handle errors like Expired, InvalidToken etc.
-		return nil, response.NewBadRequestError(err.Error())
+		if errors.Is(err, entity.ErrInvalidToken) || errors.Is(err, entity.ErrInvitationExpired) || errors.Is(err, entity.ErrInvitationAccepted) {
+			return nil, response.NewBadRequestError(err.Error())
+		}
+		if errors.Is(err, entity.ErrMemberAlreadyExists) {
+			return nil, response.NewConflictError(err.Error())
+		}
+		global.Logger.Error("TenantController.AcceptInvitation: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToTenantMemberResponse(member), nil

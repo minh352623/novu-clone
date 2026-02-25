@@ -1,6 +1,9 @@
 package controller
 
 import (
+	"errors"
+
+	"CONVERDA/global"
 	"CONVERDA/internal/iam/application/service"
 	"CONVERDA/internal/iam/controller/dto"
 	"CONVERDA/internal/iam/domain/model/entity"
@@ -42,7 +45,8 @@ func (c *PricingPlanController) CreatePricingPlan(ctx *gin.Context) (interface{}
 
 	plan, err := c.planService.CreatePricingPlan(ctx.Request.Context(), req.Name, req.Slug, req.MonthlyCredits, req.Price, req.Currency)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.CreatePricingPlan: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToPricingPlanResponse(plan), nil
@@ -67,10 +71,11 @@ func (c *PricingPlanController) GetPricingPlan(ctx *gin.Context) (interface{}, e
 
 	plan, err := c.planService.GetPricingPlan(ctx.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrPlanNotFound {
+		if errors.Is(err, service.ErrPlanNotFound) {
 			return nil, response.NewNotFoundError("Pricing plan not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.GetPricingPlan: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToPricingPlanResponse(plan), nil
@@ -120,7 +125,8 @@ func (c *PricingPlanController) ListPricingPlans(ctx *gin.Context) (interface{},
 
 	plans, total, err := c.planService.ListPricingPlans(ctx.Request.Context(), filters)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.ListPricingPlans: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.NewPaginatedResponse(dto.ToPricingPlanResponseList(plans), total, params.Page, params.PageSize), nil
@@ -151,10 +157,11 @@ func (c *PricingPlanController) UpdatePricingPlan(ctx *gin.Context) (interface{}
 
 	plan, err := c.planService.GetPricingPlan(ctx.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrPlanNotFound {
+		if errors.Is(err, service.ErrPlanNotFound) {
 			return nil, response.NewNotFoundError("Pricing plan not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.UpdatePricingPlan: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	// Update fields
@@ -188,13 +195,15 @@ func (c *PricingPlanController) UpdatePricingPlan(ctx *gin.Context) (interface{}
 	}
 
 	if err := c.planService.UpdatePricingPlan(ctx.Request.Context(), updatedStruct); err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.UpdatePricingPlan: update failed", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	// Fetch updated
 	updatedPlan, err := c.planService.GetPricingPlan(ctx.Request.Context(), id)
 	if err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.UpdatePricingPlan: fetch updated failed", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return dto.ToPricingPlanResponse(updatedPlan), nil
@@ -218,7 +227,8 @@ func (c *PricingPlanController) DeletePricingPlan(ctx *gin.Context) (interface{}
 	}
 
 	if err := c.planService.DeletePricingPlan(ctx.Request.Context(), id); err != nil {
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.DeletePricingPlan: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return nil, nil // Wrapper handles 204
@@ -242,10 +252,11 @@ func (c *PricingPlanController) SetAsDefault(ctx *gin.Context) (interface{}, err
 	}
 
 	if err := c.planService.SetAsDefault(ctx.Request.Context(), id); err != nil {
-		if err == service.ErrPlanNotFound {
+		if errors.Is(err, service.ErrPlanNotFound) {
 			return nil, response.NewNotFoundError("Pricing plan not found")
 		}
-		return nil, response.NewInternalServerError(err.Error())
+		global.Logger.Error("PricingPlanController.SetAsDefault: unexpected error", "error", err)
+		return nil, response.NewInternalServerError("An internal error occurred")
 	}
 
 	return gin.H{"message": "Pricing plan set as default successfully"}, nil

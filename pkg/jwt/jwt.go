@@ -19,13 +19,26 @@ var (
 
 // Claims represents custom JWT claims
 type Claims struct {
-	UserId string `json:"userId"` // Changed to string for UUID
-	Email  string `json:"email"`
+	UserId     string   `json:"userId"`
+	Email      string   `json:"email"`
+	TenantID   string   `json:"tenantId,omitempty"`
+	TenantSlug string   `json:"tenantSlug,omitempty"`
+	Roles      []string `json:"roles,omitempty"`
+	Plan       string   `json:"plan,omitempty"`
 	jwt.RegisteredClaims
 }
 
+// TenantClaims holds optional tenant context for token generation.
+// Pass nil for endpoints where tenant context is not available (e.g. Register).
+type TenantClaims struct {
+	TenantID   string
+	TenantSlug string
+	Roles      []string
+	Plan       string
+}
+
 // GenerateAccessToken generates a new access token
-func GenerateAccessToken(userId string, email string) (string, int64, error) {
+func GenerateAccessToken(userId string, email string, tc *TenantClaims) (string, int64, error) {
 	expiresIn, err := time.ParseDuration(global.Config.Auth.JwtExpiresIn)
 	if err != nil {
 		// Fallback to default 15 minutes if parsing fails
@@ -45,6 +58,14 @@ func GenerateAccessToken(userId string, email string) (string, int64, error) {
 		},
 	}
 
+	// Populate tenant context if available
+	if tc != nil {
+		claims.TenantID = tc.TenantID
+		claims.TenantSlug = tc.TenantSlug
+		claims.Roles = tc.Roles
+		claims.Plan = tc.Plan
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(global.Config.Auth.JwtSecret))
 	if err != nil {
@@ -55,7 +76,7 @@ func GenerateAccessToken(userId string, email string) (string, int64, error) {
 }
 
 // GenerateRefreshToken generates a new refresh token
-func GenerateRefreshToken(userId string, email string) (string, time.Time, error) {
+func GenerateRefreshToken(userId string, email string, tc *TenantClaims) (string, time.Time, error) {
 	expiresIn, err := time.ParseDuration(global.Config.Auth.JwtRefreshExpiresIn)
 	if err != nil {
 		// Fallback to default 24 hours if parsing fails
@@ -73,6 +94,14 @@ func GenerateRefreshToken(userId string, email string) (string, time.Time, error
 			Issuer:    "converda-service",
 			Subject:   userId,
 		},
+	}
+
+	// Populate tenant context if available
+	if tc != nil {
+		claims.TenantID = tc.TenantID
+		claims.TenantSlug = tc.TenantSlug
+		claims.Roles = tc.Roles
+		claims.Plan = tc.Plan
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

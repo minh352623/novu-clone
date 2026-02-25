@@ -139,7 +139,10 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 	}
 
 	// 2. Check if pending invitation exists
-	existingInvite, _ := s.invitationRepo.GetByEmailAndTenant(ctx, email, tenantID)
+	existingInvite, err := s.invitationRepo.GetByEmailAndTenant(ctx, email, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("memberService.InviteMember check existing invitation: %w", err)
+	}
 	if existingInvite != nil {
 		return nil, service.ErrInvitationAlreadyPending
 	}
@@ -147,7 +150,7 @@ func (s *memberServiceImpl) InviteMember(ctx context.Context, tenantID uuid.UUID
 	// 3. Create Invitation
 	invitation, err := entity.NewTenantInvitation(tenantID, email, roleID, appID, &invitedBy, 24*7*time.Hour)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("memberService.InviteMember create invitation: %w", err)
 	}
 
 	createdInvite, err := s.invitationRepo.Create(ctx, invitation)

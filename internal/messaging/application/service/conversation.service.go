@@ -23,8 +23,8 @@ type ConversationService interface {
 	GetThread(ctx context.Context, envID, threadID uuid.UUID) (*entity.Thread, error)
 	GetMessagesByThread(ctx context.Context, envID, threadID uuid.UUID, limit, offset int) ([]*entity.Message, int64, error)
 	GetMessagesByCursor(ctx context.Context, envID, threadID uuid.UUID, cursor string, direction string, limit int) ([]*entity.Message, string, string, error)
-	GetOrCreateDirectThread(ctx context.Context, envID, memberID uuid.UUID, targetID uuid.UUID, targetType string) (*entity.Thread, error)
-	CreateGroupThread(ctx context.Context, envID uuid.UUID, name string, participants []*entity.ThreadParticipant) (*entity.Thread, error)
+	GetOrCreateDirectThread(ctx context.Context, tenantID, envID, memberID uuid.UUID, targetID uuid.UUID, targetType string) (*entity.Thread, error)
+	CreateGroupThread(ctx context.Context, tenantID, envID uuid.UUID, name string, participants []*entity.ThreadParticipant) (*entity.Thread, error)
 	UpdateGroupThread(ctx context.Context, envID, threadID uuid.UUID, name string) error
 	AddGroupParticipants(ctx context.Context, envID, threadID uuid.UUID, participants []*entity.ThreadParticipant) error
 	RemoveGroupParticipant(ctx context.Context, envID, threadID uuid.UUID, entityType string, entityID uuid.UUID) error

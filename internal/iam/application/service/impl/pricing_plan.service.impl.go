@@ -33,26 +33,12 @@ func (s *pricingPlanServiceImpl) CreatePricingPlan(ctx context.Context, name, sl
 		return nil, fmt.Errorf("pricing plan with slug '%s' already exists", slug)
 	}
 
-	// Create plan (Assuming entity.NewPricingPlan exists or struct init)
-	// Since NewPricingPlan doesn't seem to exist in previous context, I'll direct struct init or create it if needed.
-	// Looking back at logs, entity.PricingPlan struct is standard.
-	// I will use direct struct initialization as per standard unless factory provided.
-	// Actually, looking at previous files, entity.go usually has validation.
-	// I'll assume direct initialization then validate.
-
-	plan := &entity.PricingPlan{
-		ID:             uuid.New(),
-		Name:           name,
-		Slug:           slug,
-		MonthlyCredits: monthlyCredits,
-		Price:          price,
-		Currency:       currency,
-		IsActive:       true,
-		IsDefault:      false,
+	// Create plan using factory method
+	plan, err := entity.NewPricingPlan(name, slug, monthlyCredits, price)
+	if err != nil {
+		return nil, fmt.Errorf("pricingPlanService.CreatePricingPlan: %w", err)
 	}
-
-	// If the entity has a Validate method, we should call it.
-	// But let's stick to the pattern.
+	plan.Currency = currency
 
 	// Persist
 	createdPlan, err := s.planRepo.Create(ctx, plan)

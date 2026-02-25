@@ -21,17 +21,22 @@ func (m *PricingPlanMapper) ToDomain(model *model.PricingPlanModel) *entity.Pric
 		return nil
 	}
 	return &entity.PricingPlan{
-		ID:             model.ID,
-		Name:           model.Name,
-		Slug:           model.Slug,
-		MonthlyCredits: model.MonthlyCredits,
-		Price:          model.Price,
-		Currency:       model.Currency,
-		Description:    model.Description,
-		IsActive:       model.IsActive,
-		IsDefault:      model.IsDefault,
-		CreatedAt:      model.CreatedAt,
-		UpdatedAt:      model.UpdatedAt,
+		ID:                  model.ID,
+		Name:                model.Name,
+		Slug:                model.Slug,
+		MonthlyCredits:      model.MonthlyCredits,
+		Price:               model.Price,
+		Currency:            model.Currency,
+		Description:         model.Description,
+		IsActive:            model.IsActive,
+		IsDefault:           model.IsDefault,
+		MaxApps:             model.MaxApps,
+		MaxMembers:          model.MaxMembers,
+		MaxWorkflows:        model.MaxWorkflows,
+		MaxMessagesPerMonth: model.MaxMessagesPerMonth,
+		RateLimitRPM:        model.RateLimitRPM,
+		CreatedAt:           model.CreatedAt,
+		UpdatedAt:           model.UpdatedAt,
 	}
 }
 
@@ -40,17 +45,22 @@ func (m *PricingPlanMapper) ToModel(entity *entity.PricingPlan) *model.PricingPl
 		return nil
 	}
 	return &model.PricingPlanModel{
-		ID:             entity.ID,
-		Name:           entity.Name,
-		Slug:           entity.Slug,
-		MonthlyCredits: entity.MonthlyCredits,
-		Price:          entity.Price,
-		Currency:       entity.Currency,
-		Description:    entity.Description,
-		IsActive:       entity.IsActive,
-		IsDefault:      entity.IsDefault,
-		CreatedAt:      entity.CreatedAt,
-		UpdatedAt:      entity.UpdatedAt,
+		ID:                  entity.ID,
+		Name:                entity.Name,
+		Slug:                entity.Slug,
+		MonthlyCredits:      entity.MonthlyCredits,
+		Price:               entity.Price,
+		Currency:            entity.Currency,
+		Description:         entity.Description,
+		IsActive:            entity.IsActive,
+		IsDefault:           entity.IsDefault,
+		MaxApps:             entity.MaxApps,
+		MaxMembers:          entity.MaxMembers,
+		MaxWorkflows:        entity.MaxWorkflows,
+		MaxMessagesPerMonth: entity.MaxMessagesPerMonth,
+		RateLimitRPM:        entity.RateLimitRPM,
+		CreatedAt:           entity.CreatedAt,
+		UpdatedAt:           entity.UpdatedAt,
 	}
 }
 
@@ -73,6 +83,7 @@ func (m *TenantMapper) ToDomain(model *model.TenantModel) *entity.Tenant {
 		ID:            model.ID,
 		Name:          model.Name,
 		Slug:          model.Slug,
+		Status:        entity.TenantStatus(model.Status),
 		PricingPlanID: model.PricingPlanID,
 		PlanStartDate: model.PlanStartDate,
 		CreatedAt:     model.CreatedAt,
@@ -92,6 +103,7 @@ func (m *TenantMapper) ToModel(entity *entity.Tenant) *model.TenantModel {
 		ID:            entity.ID,
 		Name:          entity.Name,
 		Slug:          entity.Slug,
+		Status:        string(entity.Status),
 		PricingPlanID: entity.PricingPlanID,
 		PlanStartDate: entity.PlanStartDate,
 		CreatedAt:     entity.CreatedAt,

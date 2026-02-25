@@ -11,13 +11,15 @@ import (
 
 // MembershipCheckerAdapter adapts TenantMemberRepository to MembershipChecker interface
 type MembershipCheckerAdapter struct {
-	memberRepo repository.TenantMemberRepository
+	memberRepo   repository.TenantMemberRepository
+	tenantReader repository.TenantReader
 }
 
 // NewMembershipCheckerAdapter creates a new adapter
-func NewMembershipCheckerAdapter(memberRepo repository.TenantMemberRepository) *MembershipCheckerAdapter {
+func NewMembershipCheckerAdapter(memberRepo repository.TenantMemberRepository, tenantReader repository.TenantReader) *MembershipCheckerAdapter {
 	return &MembershipCheckerAdapter{
-		memberRepo: memberRepo,
+		memberRepo:   memberRepo,
+		tenantReader: tenantReader,
 	}
 }
 
@@ -57,6 +59,18 @@ func (a *MembershipCheckerAdapter) GetMemberByTenantUserAndApp(ctx context.Conte
 	}
 
 	return uuid.Nil, nil, fmt.Errorf("user is not a member")
+}
+
+// GetTenantStatus implements MembershipChecker interface
+func (a *MembershipCheckerAdapter) GetTenantStatus(ctx context.Context, tenantID uuid.UUID) (string, error) {
+	tenant, err := a.tenantReader.GetByID(ctx, tenantID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get tenant: %w", err)
+	}
+	if tenant == nil {
+		return "", fmt.Errorf("tenant not found")
+	}
+	return string(tenant.Status), nil
 }
 
 // PermissionCheckerAdapter adapts RoleRepository to PermissionChecker interface

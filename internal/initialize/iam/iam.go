@@ -7,6 +7,7 @@ import (
 	"CONVERDA/internal/iam/infrastructure/email"
 	"CONVERDA/internal/iam/infrastructure/persistence/repository"
 	"CONVERDA/internal/middleware"
+	"CONVERDA/pkg/gdpr"
 
 	"gorm.io/gorm"
 
@@ -39,15 +40,24 @@ func InitIAMModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Hand
 	tokenService := impl.NewTokenService()
 
 	// Middleware Adapters
-	membershipChecker := middleware.NewMembershipCheckerAdapter(memberRepo)
+	membershipChecker := middleware.NewMembershipCheckerAdapter(memberRepo, tenantRepo)
 	permissionChecker := middleware.NewPermissionCheckerAdapter(roleRepo)
 	tenantMembershipMiddleware := middleware.TenantMembershipMiddleware(membershipChecker)
+
+	// GDPR Service + Providers
+	gdprService := gdpr.NewService(
+		gdpr.NewProfileProvider(db),
+		gdpr.NewMessageProvider(db),
+		gdpr.NewSubscriptionProvider(db),
+		gdpr.NewAuditLogProvider(db),
+	)
 
 	// Controllers
 	authController := controller.NewAuthController(authService, tokenService)
 	tenantController := controller.NewTenantController(tenantService, memberService)
 	roleController := controller.NewRoleController(roleService, memberService)
 	pricingPlanController := controller.NewPricingPlanController(pricingPlanService)
+	gdprController := controller.NewGDPRController(gdprService)
 
 	// Register Routes using the controller's register function
 	controller.RegisterIAMRoutes(
@@ -56,6 +66,7 @@ func InitIAMModule(router *gin.RouterGroup, db *gorm.DB, authMiddleware gin.Hand
 		tenantController,
 		roleController,
 		pricingPlanController,
+		gdprController,
 		authMiddleware,
 		tenantMembershipMiddleware,
 		permissionChecker,

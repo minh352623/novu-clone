@@ -237,6 +237,7 @@ func (r *TestMessagingTxRepository) AssignmentLogs() domainRepo.AssignmentLogRep
 
 func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
 	ctx := context.Background()
+	tenantID := uuid.New()
 	envID := uuid.New()
 	memberID := uuid.New()
 	targetSubID := uuid.New()
@@ -274,7 +275,7 @@ func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
 			return p.EntityType == "subscriber" && p.EntityID == targetSubID
 		})).Return(nil).Once()
 
-		thread, err := service.GetOrCreateDirectThread(ctx, envID, memberID, targetSubID, "subscriber")
+		thread, err := service.GetOrCreateDirectThread(ctx, tenantID, envID, memberID, targetSubID, "subscriber")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, thread)
@@ -293,7 +294,7 @@ func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
 		// Mock: Fallback to fetch existing
 		mockThreadRepo.On("GetDirectThreadBetweenEntities", ctx, "user", memberID, "subscriber", targetSubID).Return(existingThread, nil).Once()
 
-		thread, err := service.GetOrCreateDirectThread(ctx, envID, memberID, targetSubID, "subscriber")
+		thread, err := service.GetOrCreateDirectThread(ctx, tenantID, envID, memberID, targetSubID, "subscriber")
 
 		assert.NoError(t, err)
 		assert.Equal(t, existingThread.ID, thread.ID)
@@ -303,6 +304,7 @@ func TestConversationService_GetOrCreateDirectThread(t *testing.T) {
 
 func TestConversationService_CreateGroupThread(t *testing.T) {
 	ctx := context.Background()
+	tenantID := uuid.New()
 	envID := uuid.New()
 	agentID := uuid.New()
 	subID := uuid.New()
@@ -338,7 +340,7 @@ func TestConversationService_CreateGroupThread(t *testing.T) {
 
 		mockThreadRepo.On("AddParticipant", ctx, mock.AnythingOfType("*entity.ThreadParticipant")).Return(nil).Twice()
 
-		thread, err := service.CreateGroupThread(ctx, envID, "Group X", participants)
+		thread, err := service.CreateGroupThread(ctx, tenantID, envID, "Group X", participants)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, thread)

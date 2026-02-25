@@ -16,6 +16,7 @@ func RegisterIAMRoutes(
 	tenantController *TenantController,
 	roleController *RoleController,
 	pricingPlanController *PricingPlanController,
+	gdprController *GDPRController,
 	authMiddleware gin.HandlerFunc,
 	tenantMembershipMiddleware gin.HandlerFunc,
 	permissionChecker middleware.PermissionChecker,
@@ -145,6 +146,24 @@ func RegisterIAMRoutes(
 			pricingGroup.PUT("/:id", response.Wrap(pricingPlanController.UpdatePricingPlan, http.StatusOK))
 			pricingGroup.DELETE("/:id", response.Wrap(pricingPlanController.DeletePricingPlan, http.StatusOK))
 			pricingGroup.POST("/:id/default", response.Wrap(pricingPlanController.SetAsDefault, http.StatusOK))
+		}
+	}
+
+	// GDPR compliance routes (scoped to tenant, require membership)
+	gdprGroup := router.Group("/tenants/:id/gdpr")
+	if authMiddleware != nil {
+		gdprGroup.Use(authMiddleware)
+	}
+	if tenantMembershipMiddleware != nil {
+		gdprGroup.Use(tenantMembershipMiddleware)
+	}
+	if gdprController != nil {
+		if permissionChecker != nil {
+			gdprGroup.POST("/export", middleware.RequirePermission(permissionChecker, "iam.gdpr.export"), response.Wrap(gdprController.ExportData, http.StatusOK))
+			gdprGroup.POST("/erase", middleware.RequirePermission(permissionChecker, "iam.gdpr.erase"), response.Wrap(gdprController.EraseData, http.StatusOK))
+		} else {
+			gdprGroup.POST("/export", response.Wrap(gdprController.ExportData, http.StatusOK))
+			gdprGroup.POST("/erase", response.Wrap(gdprController.EraseData, http.StatusOK))
 		}
 	}
 }

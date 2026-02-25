@@ -11,6 +11,7 @@ import (
 
 type Subscriber struct {
 	ID            uuid.UUID       `json:"id"`
+	TenantID      uuid.UUID       `json:"tenant_id"`
 	EnvironmentID uuid.UUID       `json:"environment_id"`
 	SubscriberKey string          `json:"subscriber_key"`
 	Email         *string         `json:"email"`
@@ -54,6 +55,7 @@ func (t *Thread) TransitionTo(target ThreadStatus) error {
 
 type Thread struct {
 	ID            uuid.UUID       `json:"id"`
+	TenantID      uuid.UUID       `json:"tenant_id"`
 	EnvironmentID uuid.UUID       `json:"environment_id"`
 	Type          string          `json:"type"`    // direct, group, support
 	Channel       string          `json:"channel"` // zalo, facebook, web
@@ -115,9 +117,10 @@ const (
 	MessageTypeInternalNote = "internal_note"
 )
 
-func NewSubscriber(envID uuid.UUID, key string) *Subscriber {
+func NewSubscriber(tenantID, envID uuid.UUID, key string) *Subscriber {
 	return &Subscriber{
 		ID:            uuid.New(),
+		TenantID:      tenantID,
 		EnvironmentID: envID,
 		SubscriberKey: key,
 		CreatedAt:     time.Now(),
@@ -125,9 +128,10 @@ func NewSubscriber(envID uuid.UUID, key string) *Subscriber {
 	}
 }
 
-func NewThread(envID uuid.UUID, threadType, channel string) *Thread {
+func NewThread(tenantID, envID uuid.UUID, threadType, channel string) *Thread {
 	return &Thread{
 		ID:            uuid.New(),
+		TenantID:      tenantID,
 		EnvironmentID: envID,
 		Type:          threadType,
 		Channel:       channel,
