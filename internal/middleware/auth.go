@@ -29,23 +29,25 @@ const (
 // AuthMiddleware is the JWT authentication middleware
 func AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		authHeader := ctx.GetHeader("Authorization")
-		if authHeader == "" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(
-				http.StatusUnauthorized,
-				"Unauthorized",
-				"Authorization header is required",
-			))
-			return
+		tokenString := ""
+
+		// 1. Try to get token from cookie first
+		cookieToken, err := ctx.Cookie("token")
+		if err == nil && cookieToken != "" {
+			tokenString = cookieToken
+		} else {
+			// 2. Fallback to Authorization header
+			authHeader := ctx.GetHeader("Authorization")
+			if authHeader != "" {
+				tokenString = jwt.ExtractTokenFromHeader(authHeader)
+			}
 		}
 
-		// Extract token from header
-		tokenString := jwt.ExtractTokenFromHeader(authHeader)
 		if tokenString == "" {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response.NewAPIError(
 				http.StatusUnauthorized,
 				"Unauthorized",
-				"Invalid authorization header format. Use: Bearer <token>",
+				"Missing authorization token in cookie or header",
 			))
 			return
 		}
@@ -135,13 +137,18 @@ func GetEmailFromContext(ctx *gin.Context) (string, bool) {
 // It will set user info if token is provided, but won't block if not
 func OptionalAuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		authHeader := ctx.GetHeader("Authorization")
-		if authHeader == "" {
-			ctx.Next()
-			return
+		tokenString := ""
+
+		cookieToken, err := ctx.Cookie("token")
+		if err == nil && cookieToken != "" {
+			tokenString = cookieToken
+		} else {
+			authHeader := ctx.GetHeader("Authorization")
+			if authHeader != "" {
+				tokenString = jwt.ExtractTokenFromHeader(authHeader)
+			}
 		}
 
-		tokenString := jwt.ExtractTokenFromHeader(authHeader)
 		if tokenString == "" {
 			ctx.Next()
 			return

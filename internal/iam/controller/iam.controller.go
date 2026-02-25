@@ -85,6 +85,10 @@ func (c *AuthController) Register(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewInternalServerError("Failed to generate refresh token")
 	}
 
+	// Set HttpOnly cookie
+	maxAge := 24 * 60 * 60 // 1 day
+	ctx.SetCookie("token", accessToken, maxAge, "/", "", false, true)
+
 	return dto.AuthResponse{
 		User:         dto.ToUserResponse(user),
 		Token:        accessToken,
@@ -124,11 +128,28 @@ func (c *AuthController) Login(ctx *gin.Context) (interface{}, error) {
 		return nil, response.NewInternalServerError("Failed to generate refresh token")
 	}
 
+	// Set HttpOnly cookie
+	maxAge := 24 * 60 * 60 // 1 day
+	ctx.SetCookie("token", accessToken, maxAge, "/", "", false, true)
+
 	return dto.AuthResponse{
 		User:         dto.ToUserResponse(user),
 		Token:        accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+}
+
+// Logout godoc
+// @Summary Logout user
+// @Description Clear the authentication cookie
+// @Tags Auth
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /auth/logout [post]
+func (c *AuthController) Logout(ctx *gin.Context) (interface{}, error) {
+	// Clear the HttpOnly cookie
+	ctx.SetCookie("token", "", -1, "/", "", false, true)
+	return map[string]string{"message": "Logged out successfully"}, nil
 }
 
 // ChangePassword godoc

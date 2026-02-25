@@ -1,0 +1,75 @@
+.dashboard-page { animation: fadeIn var(--t-normal); }
+.tenant-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--s-6);
+}
+.tenant-detail h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+.tenant-slug {
+  font-size: var(--text-sm);
+  color: var(--c-text-muted);
+}
+.tenant-plan {
+  text-align: right;
+}
+.plan-name {
+  display: block;
+  font-weight: 600;
+  font-size: var(--text-lg);
+}
+.plan-price {
+  font-size: var(--text-sm);
+  color: var(--c-text-secondary);
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
+}
+.stat-card {
+  text-align: center;
+  padding: var(--s-5);
+}
+.stat-label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--s-2);
+}
+.stat-value {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.stat-limit {
+  font-size: var(--text-sm);
+  color: var(--c-text-muted);
+}
+.usage-section h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--s-5);
+}
+.usage-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.usage-item { }
+.usage-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  margin-bottom: var(--s-2);
+}
+.usage-count {
+  color: var(--c-text-secondary);
+  font-weight: 500;
+}

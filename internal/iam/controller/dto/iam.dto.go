@@ -151,6 +151,7 @@ type TenantResponse struct {
 	ID            uuid.UUID            `json:"id"`
 	Name          string               `json:"name"`
 	Slug          string               `json:"slug"`
+	Status        string               `json:"status"`
 	PricingPlanID *uuid.UUID           `json:"pricing_plan_id,omitempty"`
 	PricingPlan   *PricingPlanResponse `json:"pricing_plan,omitempty"`
 	PlanStartDate time.Time            `json:"plan_start_date"`
@@ -166,6 +167,7 @@ func ToTenantResponse(tenant *entity.Tenant) *TenantResponse {
 		ID:            tenant.ID,
 		Name:          tenant.Name,
 		Slug:          tenant.Slug,
+		Status:        string(tenant.Status),
 		PricingPlanID: tenant.PricingPlanID,
 		PlanStartDate: tenant.PlanStartDate,
 		CreatedAt:     tenant.CreatedAt,
@@ -187,14 +189,19 @@ func ToTenantResponseList(tenants []*entity.Tenant) []*TenantResponse {
 
 // PricingPlanResponse represents pricing plan response
 type PricingPlanResponse struct {
-	ID             uuid.UUID `json:"id"`
-	Name           string    `json:"name"`
-	Slug           string    `json:"slug"`
-	MonthlyCredits int64     `json:"monthly_credits"`
-	Price          float64   `json:"price"`
-	Currency       string    `json:"currency"`
-	IsActive       bool      `json:"is_active"`
-	IsDefault      bool      `json:"is_default"`
+	ID                  uuid.UUID `json:"id"`
+	Name                string    `json:"name"`
+	Slug                string    `json:"slug"`
+	MonthlyCredits      int64     `json:"monthly_credits"`
+	Price               float64   `json:"price"`
+	Currency            string    `json:"currency"`
+	IsActive            bool      `json:"is_active"`
+	IsDefault           bool      `json:"is_default"`
+	MaxApps             int       `json:"max_apps"`
+	MaxMembers          int       `json:"max_members"`
+	MaxWorkflows        int       `json:"max_workflows"`
+	MaxMessagesPerMonth int64     `json:"max_messages_per_month"`
+	RateLimitRPM        int       `json:"rate_limit_rpm"`
 }
 
 // ToPricingPlanResponse converts entity to response
@@ -204,14 +211,19 @@ func ToPricingPlanResponse(plan *entity.PricingPlan) *PricingPlanResponse {
 	}
 
 	return &PricingPlanResponse{
-		ID:             plan.ID,
-		Name:           plan.Name,
-		Slug:           plan.Slug,
-		MonthlyCredits: plan.MonthlyCredits,
-		Price:          plan.Price,
-		Currency:       plan.Currency,
-		IsActive:       plan.IsActive,
-		IsDefault:      plan.IsDefault,
+		ID:                  plan.ID,
+		Name:                plan.Name,
+		Slug:                plan.Slug,
+		MonthlyCredits:      plan.MonthlyCredits,
+		Price:               plan.Price,
+		Currency:            plan.Currency,
+		IsActive:            plan.IsActive,
+		IsDefault:           plan.IsDefault,
+		MaxApps:             plan.MaxApps,
+		MaxMembers:          plan.MaxMembers,
+		MaxWorkflows:        plan.MaxWorkflows,
+		MaxMessagesPerMonth: plan.MaxMessagesPerMonth,
+		RateLimitRPM:        plan.RateLimitRPM,
 	}
 }
 

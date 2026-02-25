@@ -249,3 +249,75 @@
 {"time":"2026-02-25T10:21:52+07:00","level":"INFO","msg":"SLA Worker started"}
 {"time":"2026-02-25T10:21:52+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
 {"time":"2026-02-25T10:21:52+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:37:10+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:37:11+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:39:31+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:39:32+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:44:54+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:44:55+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:47:52+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:47:53+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:48:13+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:48:14+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:50:21+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:50:22+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T10:54:16+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T10:54:17+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T11:00:59+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T11:01:00+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}
+{"time":"2026-02-25T11:09:08+07:00","level":"INFO","msg":"Postgresql init success"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"GORM init success"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"IAM module initialized"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"Apps module initialized"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"Messaging module initialized"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"SLA Worker started"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"Webhook Retry Worker started"}
+{"time":"2026-02-25T11:09:09+07:00","level":"INFO","msg":"WorkflowExecutor: started","pollInterval":30000000000}

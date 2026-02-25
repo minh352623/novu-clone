@@ -26,6 +26,7 @@ func RegisterIAMRoutes(
 	{
 		authGroup.POST("/register", response.Wrap(authController.Register, http.StatusCreated))
 		authGroup.POST("/login", response.Wrap(authController.Login, http.StatusOK))
+		authGroup.POST("/logout", response.Wrap(authController.Logout, http.StatusOK))
 		authGroup.POST("/refresh", response.Wrap(authController.RefreshToken, http.StatusOK))
 	}
 

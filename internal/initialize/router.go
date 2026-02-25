@@ -19,6 +19,7 @@ import (
 	"CONVERDA/pkg/auditlog"
 	"CONVERDA/pkg/ratelimit"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -37,6 +38,16 @@ func InitRouter(db *sql.DB) *gin.Engine {
 		gin.SetMode(gin.ReleaseMode)
 		r = gin.New()
 	}
+
+	// CORS Setup
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:5174"}, // Dashboard dev servers
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true, // For httpOnly cookies
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// -- Multi-tenant infrastructure --
 	auditLogRepo := iamRepo.NewAuditLogRepository(global.GormDB)

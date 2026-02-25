@@ -1,0 +1,45 @@
+.onboarding-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--c-bg);
+    padding: var(--s-4);
+}
+
+.onboarding-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-xl);
+    padding: var(--s-10);
+    width: 100%;
+    max-width: 480px;
+    animation: fadeIn var(--t-normal);
+}
+
+.onboarding-card h1 {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    margin-bottom: var(--s-2);
+}
+
+.onboarding-card p {
+    color: var(--c-text-secondary);
+    margin-bottom: var(--s-8);
+    line-height: 1.5;
+}
+
+.slug-preview {
+    font-size: var(--text-xs);
+    color: var(--c-text-muted);
+    margin-top: var(--s-1);
+}
+
+.onboarding-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-4);
+    font-size: var(--text-sm);
+}
